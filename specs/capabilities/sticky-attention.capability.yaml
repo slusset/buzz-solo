@@ -1,0 +1,33 @@
+capability:
+  id: sticky-attention
+  type: capability
+  status: proposed
+  description: |
+    Preserve one builder's attributable attention across surfaces by projecting
+    bounded-context briefs, accreting residue, distilling heads, binding agent
+    sessions through portable adapters, reconciling interrupted lifecycles, and
+    checkpointing context-owned artifacts without implicit publication.
+  scope:
+    personas:
+      - ../personas/sovereign-builder.md
+    journeys:
+      - ../journeys/re-enter-a-bounded-context.md
+      - ../journeys/maintain-a-durable-context-through-agent-sessions.md
+    stories:
+      - ../stories/sticky-attention/re-enter-with-a-context-brief.md
+      - ../stories/sticky-attention/accrete-attention-residue.md
+      - ../stories/sticky-attention/distill-a-context-head.md
+      - ../stories/sticky-attention/attribute-context-contributions.md
+      - ../stories/sticky-attention/bind-agent-session-to-context.md
+      - ../stories/sticky-attention/record-agent-session-lifecycle.md
+      - ../stories/sticky-attention/checkpoint-durable-context.md
+    models:
+      - ../models/sticky-attention/bounded-attention-context.model.yaml
+      - ../models/sticky-attention/bounded-attention-context.lifecycle.yaml
+      - ../models/sticky-attention/agent-session.lifecycle.yaml
+    features:
+      - ../features/sticky-attention/context-brief.feature
+      - ../features/sticky-attention/agent-session-lifecycle.feature
+    contracts:
+      - ../contracts/openapi/local-relay.yaml
+      - ../contracts/agent-harness/durable-context-hooks.yaml

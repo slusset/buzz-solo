@@ -44,3 +44,7 @@
 | Artifact reference | An `x` tag from an accepted event to immutable bytes named by SHA-256. |
 | Rendezvous custodian | A node that holds and relays selected events or referenced artifacts without becoming their author or policy owner. |
 | Steward mandate | An owner-signed grant allowing an agent to observe and optionally report without changing configuration. |
+| Harness adapter | A host integration that translates agent-session callbacks and tools into bounded-context commands without owning context identity or policy. |
+| Context binding | The unique, fail-closed association between one harness session and one opted-in bounded context. |
+| Lifecycle residue | Metadata-only start, completion, or interruption evidence written for an agent session inside its context boundary. |
+| Context checkpoint | A local, manifest-last replacement that records accepted artifact drift and repository metadata without implying publication. |

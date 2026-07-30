@@ -1,0 +1,168 @@
+id: durable-context-hooks-v0.1
+type: contract
+version: 0.1.0
+description: |
+  Harness-neutral contract for binding agent sessions to opted-in durable
+  contexts, recording metadata-only lifecycle residue, reconciling interrupted
+  sessions, and checkpointing context-owned artifacts locally.
+
+traceability:
+  persona: specs/personas/sovereign-builder.md
+  journey: specs/journeys/maintain-a-durable-context-through-agent-sessions.md
+  stories:
+    binding: specs/stories/sticky-attention/bind-agent-session-to-context.md
+    lifecycle: specs/stories/sticky-attention/record-agent-session-lifecycle.md
+    checkpoint: specs/stories/sticky-attention/checkpoint-durable-context.md
+  feature: specs/features/sticky-attention/agent-session-lifecycle.feature
+
+authority:
+  context_owned:
+    - context_id
+    - enabled
+    - lifecycle_hooks
+    - linked_directories
+    - disclosure_policy
+    - checkpoint_policy
+  adapter_owned:
+    - adapter_id
+    - supported_callbacks
+    - supported_tools
+  invariant: Adapter configuration cannot create or override context identity.
+
+operations:
+  on_session_start:
+    input:
+      required: [harness_session_id, adapter_id, working_directory, started_at]
+    behavior:
+      - resolve exactly one enabled context
+      - verify the start hook is enabled by context policy
+      - apply context disclosure policy to candidate lifecycle metadata
+      - reconcile only older sessions with positive abandonment evidence
+      - append a metadata-only start record
+    failures:
+      - no_context_match
+      - ambiguous_context_match
+      - hook_disabled
+      - metadata_rejected
+      - lifecycle_write_failed
+  on_session_end:
+    delivery: best_effort
+    input:
+      required: [harness_session_id, adapter_id, ended_at, completion_reason_code]
+    behavior:
+      - resolve the existing context binding
+      - verify the end hook is enabled by context policy
+      - reduce completion reason to a context-approved bounded code
+      - apply context disclosure policy to candidate lifecycle metadata
+      - append a metadata-only completion record
+      - correct an interrupted effective state when the completion proves an earlier end
+    failures:
+      - binding_not_found
+      - hook_disabled
+      - metadata_rejected
+      - lifecycle_write_failed
+  status:
+    mutability: read_only
+    input:
+      optional: [context_root]
+    output:
+      required: [context_id, binding_status, changed, removed, untracked]
+  checkpoint:
+    mutability: local_write
+    input:
+      optional: [context_root, label]
+    ordering:
+      - validate candidate artifacts
+      - append accepted artifact events and removal tombstones
+      - atomically replace the manifest
+      - append the manifest journal record last
+    output:
+      required: [context_id, checkpoint_id, changed_count, removed_count]
+  reconcile:
+    mutability: local_write
+    input:
+      optional: [context_root, session_ids]
+      required: [abandonment_evidence]
+    behavior:
+      - append interruption residue only for abandoned active sessions
+      - leave concurrent and unverifiable active sessions unchanged
+    output:
+      required: [context_id, reconciled_session_ids, unresolved_session_ids]
+
+schemas:
+  ContextOptIn:
+    required:
+      - context_id
+      - enabled
+      - lifecycle_hooks
+      - linked_directories
+      - disclosure_policy
+      - checkpoint_policy
+    invariants:
+      - configuration belongs to the context it enables
+      - an adapter cannot supply or override context_id
+  ContextBinding:
+    required:
+      - context_id
+      - harness_session_id
+      - adapter_id
+      - matched_working_directory
+      - matched_role
+      - resolved_at
+  LifecycleResidue:
+    allowed:
+      - context_id
+      - harness_session_id
+      - adapter_id
+      - working_directory
+      - phase
+      - timestamp
+      - completion_reason_code
+      - abandonment_evidence
+    forbidden:
+      - prompt
+      - response
+      - transcript
+      - credential
+      - error_body
+      - final_message
+    policy:
+      - optional metadata is omitted when context disclosure policy disallows it
+      - completion reasons use bounded codes rather than free-form text
+      - session identity is [context_id, adapter_id, harness_session_id]
+  AbandonmentEvidence:
+    required:
+      - kind
+      - observed_at
+    kind:
+      enum:
+        - harness_reports_terminated
+        - host_process_confirmed_dead
+        - builder_confirmed
+    invariants:
+      - elapsed time or a later session start alone is insufficient
+      - evidence names the same namespaced session being reconciled
+  CheckpointPolicy:
+    required:
+      - follow_symbolic_links
+      - sensitive_filename_patterns
+      - sensitive_content_patterns
+      - allow_binary
+      - maximum_artifact_bytes
+      - repository_capture
+    invariants:
+      - follow_symbolic_links is false
+      - allow_binary is false
+      - repository_capture is metadata_only
+      - repository remotes exclude embedded credentials
+
+publication:
+  implicit: forbidden
+  description: |
+    No operation in this contract invokes replication, synchronization, or
+    publication. Those actions require a separate explicit authorization path.
+
+reference_adapters:
+  - id: github-copilot-cli
+    status: candidate
+    evidence: not-yet-captured-in-repository
