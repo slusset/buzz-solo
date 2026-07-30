@@ -1,10 +1,10 @@
-# Contributing to Buzz
+# Contributing to Buzz Solo
 
-Welcome, and thank you for your interest in contributing! Buzz is an
-open-source project and we're glad you're here. This guide will help you
-get from zero to a merged pull request.
+Welcome, and thank you for your interest in contributing! Buzz Solo is an
+open-source, solo-first derivative of [Block's Buzz](https://github.com/block/buzz).
+This guide will help you get from zero to a merged pull request.
 
-If you have questions that aren't answered here, [open an issue](https://github.com/block/buzz/issues/new).
+If you have questions that aren't answered here, [open an issue](https://github.com/slusset/buzz-solo/issues/new).
 
 ---
 
@@ -35,7 +35,7 @@ unacceptable behavior to **conduct@buzz-relay.org**.
 
 ## Before You Open a PR
 
-Before starting, search [open PRs](https://github.com/block/buzz/pulls) and [open issues](https://github.com/block/buzz/issues) for duplicates — someone may already be working on the same thing. When you open your PR, link the closest existing one in the description (or say "none found").
+Before starting, search [open PRs](https://github.com/slusset/buzz-solo/pulls) and [open issues](https://github.com/slusset/buzz-solo/issues) for duplicates — someone may already be working on the same thing. When you open your PR, link the closest existing one in the description (or say "none found").
 
 For anything beyond a small fix, opening an issue first is strongly recommended. Describe the problem and proposed solution so a maintainer can acknowledge the approach before you build — it avoids two people building the same thing in parallel.
 
@@ -81,8 +81,8 @@ versions in the table above.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/block/buzz.git
-cd buzz
+git clone https://github.com/slusset/buzz-solo.git
+cd buzz-solo
 
 # 2. Activate Hermit (optional but recommended)
 . ./bin/activate-hermit
@@ -313,21 +313,16 @@ to existing clients.
 
 ## Ecosystem
 
-Buzz is developed across multiple repositories. This repo (`block/buzz`)
-is the open-source home for all application code — the relay, desktop app,
-mobile app, CLI, and agent harness. Internal repositories handle
-enterprise-signed builds and infrastructure deployment.
+This repo (`slusset/buzz-solo`) is the whole project — there are no
+companion build or deploy repositories. See
+[AGENTS.md § Ecosystem](AGENTS.md#ecosystem) for the runtime surface table
+and the fork's relationship to upstream `block/buzz`.
 
-See [AGENTS.md § Ecosystem](AGENTS.md#ecosystem) for the full repo table and
-dependency diagram.
-
-**External contributors:** Fork `block/buzz`, open a PR, and CI runs
+**Contributors:** Fork `slusset/buzz-solo`, open a PR, and CI runs
 automatically. No special access is required.
 
-**Block team members:** See the internal
-[sprout-releases CONTRIBUTING.md](https://github.com/squareup/sprout-releases/blob/main/CONTRIBUTING.md)
-for team access setup, onboarding, and the full repo inventory. See
-[RELEASING.md](RELEASING.md) for the release process.
+Node runtime releases are signed `node/vX.Y.Z` git tags — see
+[node-release-distribution-v0.1](specs/architecture/node-release-distribution-v0.1.md).
 
 ---
 

@@ -1,6 +1,6 @@
 # Buzz Solo — Upstream Peel & Launch Preparation v0.1
 
-Status: phases 0–1 landed, phases 2–3 proposed
+Status: phases 0–2 landed, phase 3 proposed
 Date: 2026-07-30
 
 ## Motive
@@ -68,17 +68,21 @@ workflows (`test-release-ref-contract.sh`, `test-signed-canary-contract.sh`,
 `test-mobile-*.sh`, `verify-release-ref.sh`) are orphaned by this phase
 and go with their surfaces in Phase 3.
 
-## Phase 2 — identity
+## Phase 2 — identity (landed)
 
-- Rename the repository and retitle README/CONTRIBUTING/AGENTS docs from
-  "OSS source for Block's Buzz" to the Buzz Solo statement (sovereign node,
-  portable relay, context/handoff/journal contracts).
-- Keep `upstream` as a read-only remote for selective cherry-picks; stop
-  treating upstream `main` as a merge source. The fork relationship on
-  GitHub can stay (harmless) or be detached via support — decide at rename
-  time.
-- `CLAUDE.md`/`AGENTS.md` ecosystem section rewritten: the five-repo Block
-  table no longer describes this project.
+- Repository renamed to `slusset/buzz-solo` (GitHub redirects the old
+  slug). README rewritten to the Buzz Solo statement (sovereign node,
+  portable relay, context/handoff/journal contracts); CONTRIBUTING
+  retitled and repointed.
+- `upstream` (`block/buzz`) stays a read-only remote for selective
+  cherry-picks; upstream `main` is not a merge source. The GitHub fork
+  relationship is kept (harmless, keeps cherry-pick UX); detaching via
+  support remains possible later.
+- `AGENTS.md` ecosystem section rewritten: the five-repo Block table
+  replaced with the Solo runtime-surface table and a retiring-surfaces
+  notice. Deeper doc sweep (RELEASING.md, TESTING.md, VISION docs, the
+  desktop/mobile sections of AGENTS.md) goes with Phase 3, when the
+  surfaces they document leave the tree.
 
 ## Phase 3 — code peel (needs dependency analysis first)
 

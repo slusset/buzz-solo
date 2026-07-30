@@ -1,6 +1,6 @@
 # AGENTS.md — AI Agent Contributor Guide
 
-This guide is for AI agents contributing to the Buzz codebase. It covers
+This guide is for AI agents contributing to the Buzz Solo codebase. It covers
 agent-specific context and conventions. For general contributor info (setup,
 code style, PR process, architecture), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -8,27 +8,23 @@ code style, PR process, architecture), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Ecosystem
 
-Buzz spans five repos. This one (`block/buzz`) is the OSS source for the relay, desktop, mobile, and CLI. The others handle internal builds and deployment:
+This repo (`slusset/buzz-solo`) is the whole project: a solo-first derivative
+of [block/buzz](https://github.com/block/buzz) — one owner, many nodes, one
+journal. There is no companion build or deploy repo. The runtime surfaces are:
 
-| Repo | Purpose |
-|------|---------|
-| [block/buzz](https://github.com/block/buzz) | OSS source — relay, desktop app, mobile app, CLI, agent harness |
-| [squareup/sprout-releases](https://github.com/squareup/sprout-releases) | Buildkite pipeline producing Block-signed macOS + iOS builds with `-block` version suffix |
-| [squareup/sprout-oss](https://github.com/squareup/sprout-oss) | CI pipeline building the relay Docker image and pushing to internal ECR |
-| [squareup/block-coder-tf-stacks](https://github.com/squareup/block-coder-tf-stacks) | Terraform + ArgoCD deploying the relay to the staging Kubernetes cluster |
-| [squareup/sprout-backend-blox](https://github.com/squareup/sprout-backend-blox) | Desktop backend provider script connecting Blox workstation agents to the relay |
+| Surface | Where |
+|---------|-------|
+| Sovereign node (durable local relay) | `crates/buzz-local-relay` |
+| Node CLI (context, journal, handoffs, sync) | `crates/buzz-cli` |
+| Cloudflare rendezvous replica | `cloudflare/portable-relay` |
+| Node runtime releases | signed `node/vX.Y.Z` git tags ([spec](specs/architecture/node-release-distribution-v0.1.md)) |
 
-```
-block/buzz (source)
-  ├─► sprout-releases    (desktop + mobile builds → Artifactory, GitHub, Mobile Releases)
-  ├─► sprout-oss         (relay Docker image → ECR)
-  │     └─► block-coder-tf-stacks  (Helm chart → ArgoCD → staging cluster)
-  └─── sprout-backend-blox         (Blox compute provider for Desktop agent launch)
-```
-
-See [RELEASING.md](RELEASING.md) for the desktop release flow and
-[CONTRIBUTING.md § Ecosystem](CONTRIBUTING.md#ecosystem) for contributor
-access information.
+`upstream` (`block/buzz`) is a read-only remote kept for selective
+cherry-picks; upstream `main` is not a merge source. Desktop, mobile, web,
+and the hosted relay stack are inherited surfaces slated for removal — see
+[the peel spec](specs/architecture/buzz-solo-upstream-peel-v0.1.md) before
+investing work in them. Sections of this guide covering those surfaces
+remain accurate while the code is in-tree but describe retiring machinery.
 
 ---
 
