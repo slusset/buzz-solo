@@ -1,0 +1,76 @@
+id: agent-session-lifecycle
+type: model
+entity: AgentSession
+description: |
+  Lifecycle evidence for one harness session bound to one durable context.
+  Completion callbacks are best effort. Next-start reconciliation closes an
+  older active session only with positive abandonment evidence, preserves
+  concurrent sessions, and permits a provably delayed completion to correct the
+  effective state without erasing history.
+
+sources:
+  stories:
+    - specs/stories/sticky-attention/bind-agent-session-to-context.md
+    - specs/stories/sticky-attention/record-agent-session-lifecycle.md
+  journeys:
+    - specs/journeys/maintain-a-durable-context-through-agent-sessions.md
+
+initial_state: active
+
+states:
+  active:
+    description: A start record exists with no terminal lifecycle residue.
+    terminal: false
+  completed:
+    description: The harness delivered a normal end callback.
+    terminal: true
+  interrupted:
+    description: |
+      A later bound session supplied positive evidence that the older session
+      was abandoned. A provably delayed completion may still correct the
+      effective state.
+    terminal: false
+
+transitions:
+  record_completion:
+    from: active
+    to: completed
+    trigger: harness_session_end
+    guards:
+      - binding-still-identifies-the-same-context
+      - completion-metadata-passes-disclosure-policy
+  reconcile_interruption:
+    from: active
+    to: interrupted
+    trigger: later_bound_session_start
+    guards:
+      - no-terminal-record-exists
+      - older-session-belongs-to-the-same-context
+      - positive-abandonment-evidence
+    description: |
+      The interruption record is durable before the later session's start is
+      appended.
+  correct_delayed_completion:
+    from: interrupted
+    to: completed
+    trigger: delayed_harness_session_end
+    guards:
+      - completion-belongs-to-the-same-namespaced-session
+      - completion-ended-before-interruption-was-observed
+    description: |
+      The interruption record remains in history; projection treats the
+      earlier completion as the effective terminal state.
+
+invalid:
+  - transition: start_without_unique_binding
+    reason: Zero or ambiguous context matches fail closed and create no session.
+  - transition: completed_to_any
+    reason: A completed session is terminal and reconciliation is idempotent.
+  - transition: interrupt_without_abandonment_evidence
+    reason: A later start alone cannot distinguish abandonment from concurrency.
+  - transition: reconcile_as_completed
+    reason: A missing callback is interruption evidence, never successful completion.
+  - transition: lifecycle_with_conversation_content
+    reason: Lifecycle residue is metadata-only and excludes conversation and error content.
+  - transition: lifecycle_implies_publication
+    reason: Local durability never authorizes replication or synchronization.
