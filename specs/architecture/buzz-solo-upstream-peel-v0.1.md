@@ -1,6 +1,6 @@
 # Buzz Solo — Upstream Peel & Launch Preparation v0.1
 
-Status: phase 0 landed, phases 1–3 proposed
+Status: phases 0–1 landed, phases 2–3 proposed
 Date: 2026-07-30
 
 ## Motive
@@ -42,7 +42,7 @@ Windows rust, server cross-compile, dead-token guard, macOS desktop build,
 and the release/mobile contract steps that guarded workflows slated for
 Phase 1 retirement.
 
-## Phase 1 — retire upstream-only workflows
+## Phase 1 — retire upstream-only workflows (landed)
 
 These serve Block's release and deploy machinery and cannot succeed on this
 fork (Block secrets, ECR, signing certs, Buildkite hand-offs). PR-triggering
@@ -63,7 +63,10 @@ Delete all eleven. Node runtime releases are already signed `node/vX.Y.Z`
 git tags per `node-release-distribution-v0.1.md` — no workflow involved.
 If a Solo release pipeline is ever wanted (e.g. attaching built `buzz`
 binaries to node tags), it gets written fresh against that spec, not
-adapted from `release.yml`.
+adapted from `release.yml`. The contract scripts that guarded these
+workflows (`test-release-ref-contract.sh`, `test-signed-canary-contract.sh`,
+`test-mobile-*.sh`, `verify-release-ref.sh`) are orphaned by this phase
+and go with their surfaces in Phase 3.
 
 ## Phase 2 — identity
 
