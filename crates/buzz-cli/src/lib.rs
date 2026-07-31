@@ -358,6 +358,28 @@ pub enum ContextSubcommand {
         #[arg(short = 'm', long, conflicts_with = "file")]
         message: Option<String>,
     },
+    /// Initialize a durable context root: .context opt-in, charter stub, journal presence.
+    Init {
+        /// Context root directory to initialize (created if missing).
+        root: std::path::PathBuf,
+        /// Kebab-case context slug, for example or-temperature-control.
+        #[arg(long)]
+        slug: String,
+        /// Human display name. Defaults to the slug.
+        #[arg(long)]
+        display_name: Option<String>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Explore bounded contexts as a read-only deterministic tree.
+    Explore {
+        /// Context root path, slug, or context id. Omit for the warmth-ordered overview.
+        target: Option<String>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Synchronize content-addressed artifacts using profile identity roles.
     #[command(subcommand)]
     Artifact(ContextArtifactSubcommand),
@@ -2259,7 +2281,7 @@ mod tests {
         let expected: Vec<(&str, usize)> = vec![
             ("agents", 5),
             ("artifact", 3),
-            ("context", 16),
+            ("context", 18),
             ("canvas", 2),
             ("channels", 16),
             ("dms", 4),

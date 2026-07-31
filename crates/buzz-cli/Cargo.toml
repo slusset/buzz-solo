@@ -35,6 +35,7 @@ thiserror = { workspace = true }
 
 # Nostr event signing — used in `buzz auth`, auto-mint, and signed event writes
 nostr = { workspace = true }
+serde_yaml = { workspace = true }
 
 # UUID parsing for validate_uuid + event building
 uuid = { workspace = true }

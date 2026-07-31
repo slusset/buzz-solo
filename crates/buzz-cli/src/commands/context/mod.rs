@@ -1,6 +1,7 @@
 mod agreement;
 mod artifact_sync;
 mod doctor;
+mod durable;
 mod handoff;
 mod journal;
 mod migrate;
@@ -94,6 +95,29 @@ pub async fn dispatch(command: &ContextCmd) -> Result<(), CliError> {
                 journal::share(&profile, &environment, file.as_deref(), message.as_deref()).await?
             );
             Ok(())
+        }
+        ContextSubcommand::Init {
+            root,
+            slug,
+            display_name,
+            json,
+        } => {
+            let environment = profile::ProfileEnvironment::from_process()?;
+            let profile = profile::resolve_profile(&command.profile, &environment)?;
+            durable::init(
+                &profile,
+                &environment,
+                root,
+                slug,
+                display_name.as_deref(),
+                *json,
+            )
+            .await
+        }
+        ContextSubcommand::Explore { target, json } => {
+            let environment = profile::ProfileEnvironment::from_process()?;
+            let profile = profile::resolve_profile(&command.profile, &environment)?;
+            durable::explore(&profile, &environment, target.as_deref(), *json).await
         }
         ContextSubcommand::Artifact(subcommand) => {
             let environment = profile::ProfileEnvironment::from_process()?;
