@@ -103,3 +103,5 @@ node.
 - [Skill distribution loop](architecture/skill-distribution-loop-v0.1.md)
 - [Node host boundary (draft)](architecture/node-host-boundary-v0.1.md)
 - [Portable relay Freenet (draft)](architecture/portable-relay-freenet-v0.1.md)
+- [Coherence monitoring (draft)](architecture/coherence-monitoring-v0.1.md)
+- [Resurrection drill (draft)](architecture/resurrection-drill-v0.1.md)

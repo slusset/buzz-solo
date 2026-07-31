@@ -273,6 +273,8 @@ at their heads. One journal, many contexts, one manifest per node.
   assertion).
 - `node-host-migration-v0.1` — full dehydrate → transport → hydrate onto
   a second host with journal replay equality and re-attested identities.
+  Named acceptance test:
+  [the resurrection drill](resurrection-drill-v0.1.md).
 
 ## Non-goals
 
