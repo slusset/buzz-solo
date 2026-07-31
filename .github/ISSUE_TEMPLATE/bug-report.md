@@ -1,24 +1,26 @@
 ---
 name: Bug report
-about: Report a reproducible bug in Buzz
+about: Report a reproducible bug in Buzz Solo
 labels: bug
 ---
+
+**Originating node**
+Which node hit this? (Nest / Vanderbilt Health / Rendezvous / other)
+
+**Surface**
+Which surface? (buzz-local-relay / buzz-cli / cloudflare portable-relay / contracts / other)
 
 **Describe the bug**
 A clear and concise description of what the bug is.
 
 **Steps to reproduce**
-1. Go to '...'
-2. Click on '...'
-3. See error
+1. Command or operation run
+2. Expected vs. observed
 
-**Expected behavior**
-What did you expect to happen?
-
-**Version and platform**
-Find your version at the bottom of the Settings sidebar. Write "unknown" if you can't determine it.
-- Buzz version: 
-- OS: 
+**Version**
+- Node runtime tag (`node/vX.Y.Z`) or commit:
+- OS / host:
 
 **Logs / additional context**
-Paste any relevant logs, error messages, or screenshots here.
+Paste relevant CLI output or relay logs. Never paste key material,
+`BUZZ_PRIVATE_KEY`, auth tags, or engram plaintext.

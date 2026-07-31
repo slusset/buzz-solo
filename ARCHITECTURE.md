@@ -3,6 +3,19 @@
 One owner, many nodes, one journal. This document is the short map; the
 authoritative detail lives in [`specs/architecture/`](specs/architecture/).
 
+## Node names
+
+| Name | Role |
+|---|---|
+| **Nest** | The Buzz Solo Durable Context home node — where the sovereign journal lives (Ted's laptop) |
+| **Vanderbilt Health domain** | Split-identity satellite host and its agent (formerly "VUMC host"); coordinates upstream to Nest via GitHub issues |
+| **Rendezvous** | The Cloudflare availability replica (its long-term role is an open exploration — rotating beacons) |
+
+The shared durable context bound across nodes is **Buzz Evolution** (the
+journal's default `h` boundary). Operational stream labels
+(`ted-laptop/sovereign`) predate these names and are unchanged until a
+deliberate migration.
+
 ## Topology
 
 ```

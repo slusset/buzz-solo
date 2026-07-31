@@ -2,10 +2,10 @@
 
 ## Repository shape
 
-Buzz is a Rust workspace with a Tauri/React desktop client and a Flutter mobile
-client. The relay is Nostr-first: new durable behavior is normally expressed as
-signed events, with a narrow HTTP bridge for generic event submission and
-queries.
+Buzz Solo is a Rust workspace centered on the sovereign node
+(`buzz-local-relay` + `buzz-cli`) with a Cloudflare rendezvous replica. The
+relay is Nostr-first: new durable behavior is normally expressed as signed
+events, with a narrow HTTP bridge for generic event submission and queries.
 
 ## Architecture sources
 
