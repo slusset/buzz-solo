@@ -56,9 +56,8 @@ We review as capacity allows — focused PRs that follow this guide move fastest
 | Tool | Version | Notes |
 |------|---------|-------|
 | Rust | 1.88+ | Install via [rustup](https://rustup.rs/) |
-| Node.js | 24+ | Required for desktop app commands and `just ci` |
-| pnpm | 10+ | Required for desktop app commands and `just ci` |
-| Flutter | 3.41+ | Required for mobile app — install via [flutter.dev](https://docs.flutter.dev/get-started/install) |
+| Node.js | 24+ | Required for admin-web / Cloudflare checks and `just ci` |
+| pnpm | 10+ | Required for admin-web / Cloudflare checks and `just ci` |
 | Docker | 24+ | For Postgres, Redis, MinIO |
 | `just` | latest | Task runner — `cargo install just` |
 | `lefthook` | 2.1.3 (Hermit-pinned) | Auto-installed by `just hooks` — no manual install needed |
@@ -105,21 +104,11 @@ Adminer on `:8082`, Keycloak on `:8180` for local OAuth/OIDC testing, MinIO on
 `:9000` for media storage, and Prometheus on `:9090` for metrics) and runs all
 pending database migrations.
 
-### Running the Relay and Desktop App
+### Running a Relay
 
 ```bash
-just dev   # starts the relay + desktop app in one command
-```
-
-`just dev` builds all agent tools, starts the relay (`ws://localhost:3000`) in
-the background, and launches the Tauri desktop app. The relay process is
-automatically killed when you quit the app or press Ctrl+C.
-
-For a split-terminal workflow (relay logs visible separately from Vite output):
-
-```bash
-just relay        # terminal 1 — relay on ws://localhost:3000
-just desktop-dev  # terminal 2 — Vite dev server only (no Tauri shell)
+just local-relay   # durable Solo relay — no Docker or external services
+just relay         # hosted relay stack (Postgres/Redis via Docker)
 ```
 
 ### Stopping / Resetting
@@ -129,11 +118,8 @@ just down    # Stop Docker services, keep data
 just reset   # Wipe all dev state and recreate it; installed Buzz is preserved
 ```
 
-Development desktop state uses separate bundle identifiers
-(`xyz.block.buzz.app.dev` and per-worktree variants), a separate keyring service
-(`buzz-desktop-dev`), and `~/.buzz-dev`. `just reset` removes those dev-only
-locations and the local Docker volumes. It does not touch the installed app's
-`xyz.block.buzz.app` data, `buzz-desktop` keyring service, or `~/.buzz` nest.
+`just reset` removes the local Docker volumes only. It does not touch the
+sovereign node's `~/.buzz-local` nest or profiles.
 
 ---
 
@@ -175,7 +161,7 @@ Run them with (requires running infrastructure):
 cargo test -p buzz-test-client -- --ignored
 ```
 
-See `TESTING.md` for the full multi-agent E2E testing guide.
+See `TESTING.md` for the live relay + CLI testing runbook.
 
 ### CI Gate
 
@@ -183,11 +169,11 @@ Before opening a PR, run the full CI gate locally:
 
 ```bash
 just ci
-# Runs: check + unit tests + desktop build + Tauri check + mobile tests
+# Runs: check (fmt + clippy + cloudflare + sovereign contracts) + unit tests + cargo-deny
 ```
 
-This is the same check that runs in CI. PRs that fail `just ci` will not be
-merged. If `just ci` fails on formatting, `just fix-all` fixes it in one shot (`rustfmt` + Tauri fmt + desktop, web, and mobile formatters).
+This mirrors the CI lanes exactly. PRs that fail `just ci` will not be
+merged. If it fails on formatting, `just fmt` fixes Rust formatting in place.
 
 ---
 
@@ -274,7 +260,7 @@ required. The scope (in parentheses) is optional but encouraged.
 
 3. **Documented** — public APIs, new event kinds, new MCP tools, and new
    config variables are documented. Update `README.md`, `AGENTS.md`, or
-   `VISION.md` as appropriate.
+   the relevant spec in `specs/architecture/` as appropriate.
 
 4. **CI passing** — `just ci` passes locally before you push.
 

@@ -53,8 +53,6 @@ jobs:
           tool: cargo-nextest@0.9.136
       - name: Unit tests
         run: just test-unit
-      - name: Local relay + CLI tests
-        run: cargo nextest run -p buzz-local-relay -p buzz-cli
 
   contracts:
     name: Sovereign Contracts

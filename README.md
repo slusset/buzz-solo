@@ -100,12 +100,13 @@ surface — if CI is green, the node is sound.
 
 ## Inherited surfaces
 
-The desktop, mobile, and web clients and the hosted multi-tenant relay stack
-(Postgres/Redis/MinIO) are upstream surfaces still present in-tree. They are
-not exercised by CI and are slated for removal in
-[phase 3 of the peel](specs/architecture/buzz-solo-upstream-peel-v0.1.md);
-everything removed stays recoverable from git history. `upstream`
-(`block/buzz`) remains a read-only remote for selective cherry-picks.
+The desktop, mobile, and web clients left the tree in
+[phase 3 of the peel](specs/architecture/buzz-solo-upstream-peel-v0.1.md) —
+everything removed stays recoverable from git history. The hosted
+multi-tenant relay stack (`buzz-relay` + Postgres/Redis/MinIO, plus the
+`admin-web` dashboard) remains in-tree pending its own decision; the drain
+leg and interop tests still exercise it. `upstream` (`block/buzz`) remains a
+read-only remote for selective cherry-picks.
 
 ---
 

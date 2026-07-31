@@ -1,6 +1,6 @@
 # Buzz Solo — Upstream Peel & Launch Preparation v0.1
 
-Status: phases 0–2 landed, phase 3 proposed
+Status: phases 0–3 landed
 Date: 2026-07-30
 
 ## Motive
@@ -84,17 +84,37 @@ and go with their surfaces in Phase 3.
   desktop/mobile sections of AGENTS.md) goes with Phase 3, when the
   surfaces they document leave the tree.
 
-## Phase 3 — code peel (needs dependency analysis first)
+## Phase 3 — code peel (landed)
 
-Candidate removals: `desktop/`, `mobile/`, `web/`, `benchmarks/`,
-`deploy/charts/`, and hosted-relay-only crates. **Not mechanical**: the Solo
-center still compiles against shared crates (`buzz-core`, `buzz-sdk`,
-`buzz-ws-client`, `buzz-auth`, …), `justfile` and pre-commit/pre-push hooks
-reference the client surfaces, and the pnpm workspace spans desktop/web/
-cloudflare. Each removal needs a build-graph check before it lands. The
-hosted relay stack (`buzz-relay`, `buzz-db`, `buzz-pubsub`, …) stays for now
-— the drain leg and interop tests still exercise it — and gets its own
-decision later.
+Build-graph findings that shaped the cut:
+
+- **Crate graph is clean.** The Solo center (`buzz-local-relay`, `buzz-cli`)
+  closes over only `buzz-core`, `buzz-auth`, `buzz-sdk`, `buzz-ws-client`,
+  `buzz-persona`. No workspace crate depends on anything under `desktop/`,
+  `mobile/`, or `web/` (desktop was its own Cargo workspace). All crates
+  stay; the desktop sidecar/harness crates (`buzz-acp`, `buzz-agent`,
+  `buzz-dev-mcp`, `sprig`, `buzz-pair-relay`, `buzz-pairing-cli`) lose their
+  main consumer but remain buildable and get their own decision with the
+  hosted stack.
+- **The relay serves web UIs from optional runtime paths** (`BUZZ_WEB_DIR`,
+  `BUZZ_ADMIN_WEB_DIR`), not embedded assets — removing `web/` cannot break
+  the relay build. Consequence: the Docker image no longer bundles a web UI,
+  so invite-landing and repo-browser routes are unavailable from it.
+  `admin-web/` stays (hosted-stack operator dashboard).
+
+Removed: `desktop/`, `mobile/`, `web/`, `benchmarks/`, `deploy/charts/`,
+`patches/` (both patches were desktop/web-only), `RELEASING.md`, the
+client-only VISION docs (`VISION_SOVEREIGN.md` stays), the orphaned
+release/canary/mobile contract scripts from Phase 1, and the desktop/mobile
+dev scripts. Tooling updated in the same commit: `justfile` (composite
+targets now mirror the five CI lanes; `test-unit` gained the Solo suites),
+`lefthook.yml`, `pnpm-workspace.yaml` + lockfile (packages: `admin-web`,
+`cloudflare/portable-relay`), `Dockerfile` (admin bundle only, Solo OCI
+labels), and the docs sweep (AGENTS/CONTRIBUTING/TESTING/ARCHITECTURE).
+
+The hosted relay stack (`buzz-relay`, `buzz-db`, `buzz-pubsub`, …,
+`admin-web/`, `deploy/compose/`, `Dockerfile`) stays — the drain leg and
+interop tests still exercise it — and gets its own decision later.
 
 ## Non-goals
 

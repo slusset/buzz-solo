@@ -2672,8 +2672,10 @@ mod tests {
 
     #[test]
     fn effort_table_fixture_matches_rust_implementation() {
-        let fixture_json =
-            include_str!("../../../desktop/src/features/agents/ui/effortTable.fixture.json");
+        // Golden fixture for the effort table. Formerly shared with the
+        // desktop UI (removed in the upstream peel); the JSON stays the
+        // reviewable source of truth for provider/model effort values.
+        let fixture_json = include_str!("../testdata/effortTable.fixture.json");
         let entries: Vec<FixtureEntry> =
             serde_json::from_str(fixture_json).expect("fixture must be valid JSON");
 

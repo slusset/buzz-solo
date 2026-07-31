@@ -4,8 +4,8 @@
 # =============================================================================
 # Usage: ./scripts/dev-setup.sh
 #
-# Starts Docker services, waits for healthy, runs migrations, installs desktop
-# deps, and prints next steps.
+# Starts Docker services, waits for healthy, runs migrations, installs JS
+# workspace deps, and prints next steps.
 # =============================================================================
 set -euo pipefail
 
@@ -132,38 +132,15 @@ done
 "${REPO_ROOT}/scripts/seed-local-community.sh"
 success "Database migrations complete"
 
-# ---- Install desktop dependencies -------------------------------------------
+# ---- Install JS workspace dependencies --------------------------------------
 
-DESKTOP_DIR="${REPO_ROOT}/desktop"
-
-if [[ -d "${DESKTOP_DIR}" ]]; then
-  if command -v pnpm &>/dev/null; then
-    log "Installing desktop dependencies (pnpm install)..."
-    (cd "${DESKTOP_DIR}" && pnpm install)
-    success "Desktop dependencies installed"
-  else
-    warn "pnpm not found — skipping desktop dependency install."
-    warn "Run '. ./bin/activate-hermit' to get pnpm, then 'just desktop-install'."
-  fi
+if command -v pnpm &>/dev/null; then
+  log "Installing JS workspace dependencies (pnpm install)..."
+  (cd "${REPO_ROOT}" && pnpm install)
+  success "JS workspace dependencies installed"
 else
-  warn "Desktop directory not found at ${DESKTOP_DIR} — skipping."
-fi
-
-# ---- Install web dependencies -----------------------------------------------
-
-WEB_DIR="${REPO_ROOT}/web"
-
-if [[ -d "${WEB_DIR}" ]]; then
-  if command -v pnpm &>/dev/null; then
-    log "Installing web dependencies (pnpm install)..."
-    (cd "${WEB_DIR}" && pnpm install)
-    success "Web dependencies installed"
-  else
-    warn "pnpm not found — skipping web dependency install."
-    warn "Run '. ./bin/activate-hermit' to get pnpm, then 'just desktop-install'."
-  fi
-else
-  warn "Web directory not found at ${WEB_DIR} — skipping."
+  warn "pnpm not found — skipping JS dependency install."
+  warn "Run '. ./bin/activate-hermit' to get pnpm, then 'pnpm install'."
 fi
 
 # ---- Install git hooks ------------------------------------------------------
@@ -192,7 +169,7 @@ echo -e "  ${BLUE}Keycloak${NC}    http://localhost:8180  (admin / admin — loc
 echo ""
 echo -e "  ${YELLOW}Next steps:${NC}"
 echo -e "    just relay                              # start the relay (terminal 1)"
-echo -e "    just dev                                # start the desktop app (terminal 2)"
+echo -e "    just local-relay                        # or: the durable Solo relay (no Docker)"
 echo ""
 echo -e "  ${YELLOW}Useful commands:${NC}"
 echo -e "    docker compose ps             # check service status"

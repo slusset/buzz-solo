@@ -24,7 +24,7 @@ Buzz is a Rust monorepo, licensed Apache 2.0 under Block, Inc.
 ┌─────────────────────────────────────────────────────────────────────┐
 │                           CLIENTS                                    │
 │                                                                      │
-│  Human (Nostr app, web, mobile)    Agent (CLI tools via buzz-cli)    │
+│  Human (any Nostr client)          Agent (CLI tools via buzz-cli)    │
 │           │                                    │                     │
 │           └──────────── WebSocket ─────────────┘                    │
 └─────────────────────────────────────────────────────────────────────┘
@@ -565,7 +565,7 @@ Real-time voice lives inside `buzz-relay` (`src/audio/`), not a separate crate. 
 
 **Room state:** an admission guard synchronizes joins against the room's ended flag; soft cap 25 peers (hard cap 255 via `u8` peer index). Per-peer audio uses a bounded channel (drop-on-full); the control channel is separate and never drops join/leave.
 
-**Lifecycle events:** the relay emits Nostr events for participant joined / left and huddle ended; the desktop client emits huddle started and guidelines. When the last peer leaves, the room ends and the channel archives atomically.
+**Lifecycle events:** the relay emits Nostr events for participant joined / left and huddle ended; clients emit huddle started and guidelines. When the last peer leaves, the room ends and the channel archives atomically.
 
 **Not yet built:** recording and per-track publishing (the corresponding kinds are reserved, no producer exists).
 

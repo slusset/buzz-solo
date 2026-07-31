@@ -1,5 +1,5 @@
 {
-  "name": "buzz-workspace",
+  "name": "buzz-solo-workspace",
   "private": true,
   "packageManager": "pnpm@11.4.0",
   "scripts": {
@@ -7,8 +7,5 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6"
-  },
-  "dependencies": {
-    "@tailwindcss/typography": "^0.5.19"
   }
 }

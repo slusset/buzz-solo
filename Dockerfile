@@ -103,13 +103,10 @@ RUN if [ -n "${NPM_REGISTRY}" ]; then \
 ENV COREPACK_INTEGRITY_KEYS=${NPM_REGISTRY:+0}
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY patches/ patches/
-COPY web/package.json web/
 COPY admin-web/package.json admin-web/
-RUN pnpm install --frozen-lockfile --filter buzz-web --filter buzz-admin-web
-COPY web/ web/
+RUN pnpm install --frozen-lockfile --filter buzz-admin-web
 COPY admin-web/ admin-web/
-RUN pnpm -C web build && pnpm -C admin-web build
+RUN pnpm -C admin-web build
 
 # ─── Stage 5: runtime ───────────────────────────────────────────────────────
 FROM debian:${DEBIAN_VERSION}-slim AS runtime
@@ -117,11 +114,11 @@ FROM debian:${DEBIAN_VERSION}-slim AS runtime
 # OCI annotations: required for GHCR to auto-link the image to this repo and
 # inherit its visibility. org.opencontainers.image.source is the load-bearing
 # one — without it GHCR keeps the image private even when the repo is public.
-LABEL org.opencontainers.image.title="Buzz" \
-      org.opencontainers.image.description="WebSocket relay server for the Buzz communications platform" \
-      org.opencontainers.image.source="https://github.com/block/buzz" \
-      org.opencontainers.image.url="https://github.com/block/buzz" \
-      org.opencontainers.image.documentation="https://github.com/block/buzz#readme" \
+LABEL org.opencontainers.image.title="Buzz Solo" \
+      org.opencontainers.image.description="WebSocket relay server for Buzz Solo" \
+      org.opencontainers.image.source="https://github.com/slusset/buzz-solo" \
+      org.opencontainers.image.url="https://github.com/slusset/buzz-solo" \
+      org.opencontainers.image.documentation="https://github.com/slusset/buzz-solo#readme" \
       org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update \
@@ -138,14 +135,13 @@ RUN apt-get update \
 COPY --from=builder    /build/target/release/buzz-relay /usr/local/bin/buzz-relay
 COPY --from=builder    /build/target/release/buzz-admin /usr/local/bin/buzz-admin
 COPY --from=builder    /build/target/release/buzz-pair-relay /usr/local/bin/buzz-pair-relay
-COPY --from=web-builder /build/web/dist                 /srv/buzz/web
 COPY --from=web-builder /build/admin-web/dist           /srv/buzz/admin-web
 
-# The invite landing page is always served from the bundled web UI. Repository
-# browser routes require the separate BUZZ_SERVE_GIT_WEB_GUI=true opt-in. The
-# admin bundle is inert until BUZZ_ADMIN_HOST is configured.
-ENV BUZZ_WEB_DIR=/srv/buzz/web \
-    BUZZ_ADMIN_WEB_DIR=/srv/buzz/admin-web
+# The web client left with the upstream peel (buzz-solo-upstream-peel-v0.1),
+# so no BUZZ_WEB_DIR is bundled — invite landing and repo-browser routes are
+# unavailable from this image. The admin bundle is inert until
+# BUZZ_ADMIN_HOST is configured.
+ENV BUZZ_ADMIN_WEB_DIR=/srv/buzz/admin-web
 
 # 3000: app (WS + REST)  ·  8080: /_liveness, /_readiness  ·  9102: /metrics
 EXPOSE 3000 8080 9102
