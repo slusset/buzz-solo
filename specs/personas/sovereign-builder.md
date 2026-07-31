@@ -39,6 +39,8 @@ operator keeps the node trustworthy; the builder inhabits it.
 - Contributions from different agents and counterparties blend together
   unless provenance is deliberately displayed.
 - Multi-node protocols keep advancing while the solo experience stays raw.
+- Seeing what the node knows requires composing queries; there is no way to
+  simply look around the contexts like a filesystem.
 
 ## Context
 
