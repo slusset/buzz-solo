@@ -20,11 +20,11 @@ journal. There is no companion build or deploy repo. The runtime surfaces are:
 | Node runtime releases | signed `node/vX.Y.Z` git tags ([spec](specs/architecture/node-release-distribution-v0.1.md)) |
 
 `upstream` (`block/buzz`) is a read-only remote kept for selective
-cherry-picks; upstream `main` is not a merge source. The desktop, mobile, and
-web clients left the tree in phase 3 of
-[the peel](specs/architecture/buzz-solo-upstream-peel-v0.1.md) — resurrect
-from git history if a client surface returns. The hosted multi-tenant relay
-stack remains in-tree pending its own decision.
+cherry-picks; upstream `main` is not a merge source. The upstream
+inheritance — clients, the hosted multi-tenant relay stack, and release
+machinery — left the tree across the phases of
+[the peel](specs/architecture/buzz-solo-upstream-peel-v0.1.md); resurrect
+from git history if a surface returns.
 
 ---
 
@@ -37,23 +37,10 @@ crates/
   buzz-cli            # Agent-first node CLI — context, journal, handoffs, sync
   # Shared protocol + client plumbing
   buzz-core           # Core types, event verification, filter matching, kind registry
+  buzz-auth           # NIP-42/98 verification
   buzz-sdk            # Typed Nostr event builders
   buzz-ws-client      # Shared NIP-42 WebSocket client (connect, auth, publish)
   buzz-persona        # Agent persona packs
-  # Hosted relay stack (stays pending its own peel decision)
-  buzz-relay          # WebSocket relay server; also hosts git + huddle audio
-  buzz-db             # Postgres event store and data access layer
-  buzz-auth           # Authentication and authorization
-  buzz-pubsub         # Redis pub/sub fan-out, presence, typing indicators
-  buzz-search         # Postgres FTS full-text search
-  buzz-audit          # Hash-chain audit log
-  buzz-media          # Blossom/S3 media storage
-  buzz-workflow       # YAML-as-code workflow engine (evalexpr conditions)
-  buzz-conformance    # Multi-tenant replay conformance checker
-  buzz-push-gateway   # Push notification gateway
-  buzz-relay-mesh     # Mesh compute routing (buzz-relay dependency)
-  buzz-admin          # Operator CLI for relay administration
-  buzz-test-client    # Integration test client and E2E test suite
   # Agent harness + interop
   buzz-acp            # ACP harness bridging Buzz events to AI agents
   buzz-agent          # Minimal ACP-compliant agent
@@ -64,15 +51,11 @@ crates/
   git-sign-nostr      # Sign git objects with a Nostr key
   git-credential-nostr # Git credential helper for Nostr-authed push/fetch
 
-admin-web/            # Read-only relay admin dashboard (hosted stack)
 cloudflare/portable-relay/  # Durable Object rendezvous replica
 specs/                # Telos + architecture specs — design lands here first
-migrations/           # SQL migrations (auto-applied on relay startup)
-schema/               # Desired-state schema for the hosted relay
-scripts/              # Dev tooling + sovereign contract suites
-examples/             # Example bots (countdown-bot)
-deploy/compose/       # Self-host Compose bundle for the hosted relay
-.env.example          # Config template — copy to .env before running
+scripts/              # Sovereign runtime scripts + contract suites
+examples/             # countdown-bot, meadow-core persona pack
+.env.example          # Dev env template for local relay + CLI runs
 ```
 
 ---
@@ -81,16 +64,8 @@ deploy/compose/       # Self-host Compose bundle for the hosted relay
 
 ```bash
 . ./bin/activate-hermit   # activate hermit toolchain (Rust, Node, etc.)
-just local-relay          # durable Solo relay at ws://127.0.0.1:3000 — no Docker
+just local-relay          # durable Solo relay at ws://127.0.0.1:3000
 just ci                   # run before any PR
-```
-
-For the hosted relay stack (Postgres/Redis/MinIO via Docker):
-
-```bash
-cp .env.example .env
-just setup
-just relay                # hosted relay at ws://localhost:3000
 ```
 
 ---
@@ -100,9 +75,6 @@ just relay                # hosted relay at ws://localhost:3000
 Run `just ci` before every PR — it runs `check` (fmt + clippy + cloudflare +
 sovereign contracts) + `test-unit` + `security` (cargo-deny). This mirrors the
 five CI lanes exactly; if `just ci` passes, CI passes.
-
-Run `just test` for integration tests if you touched `buzz-relay`,
-`buzz-db`, or `buzz-auth` — these require a running Postgres and Redis.
 
 **Pre-commit hooks** are installed by `just setup` (or `just hooks`) and
 auto-fix Rust formatting via `stage_fixed`. **Pre-push hooks** run branch-skew,
@@ -127,47 +99,26 @@ Additional rules:
 
 ## Key Patterns
 
-**Nostr-first HTTP surface**: The primary API is NIP-29 over WebSocket. The
-relay also exposes a narrow HTTP surface: NIP-11/NIP-05 metadata,
-`POST /events`, `POST /query`, `POST /count`, workflow webhooks at
-`/hooks/{id}`, Blossom media, git smart HTTP, git policy hooks, and health
-probes. These HTTP paths all preserve the same host-derived community boundary.
-
-**Prefer Nostr events over new HTTP endpoints**: For new feature work, model
-the operation as a Nostr event (new kind in `buzz-core/src/kind.rs`, handler
-in the relay) rather than adding endpoint-specific JSON APIs. If you find
-yourself reaching for a new HTTP endpoint, first check whether an event kind
-would do the job — it usually will, and you get realtime fan-out, NIP-29
-scoping, and the existing auth pipeline for free.
+**Events over endpoints**: model every operation as a signed Nostr event
+(new kind in `buzz-core/src/kind.rs`) rather than an HTTP API. The local
+relay exposes only the core Nostr event/query surface plus health probes.
 
 Reference https://github.com/nostr-protocol/nips
 
-**Event kinds**: All event kind integers are defined in
-`buzz-core/src/kind.rs`. New features get new kind integers — add them here
-first, then implement handling in the relay.
+**Event kinds**: all kind integers are defined in `buzz-core/src/kind.rs`.
+New features get new kind integers — add them here first.
 
-**Channel scoping**: Channels use `h` tags (NIP-29 group tag), not `e` tags.
-Filters and queries must scope to `h` tags when operating within a channel.
-Sovereign journal records carry the same `h` boundary
-(`context.default_h` in the node profile).
+**Context boundary**: sovereign journal records carry an `h` tag
+(`context.default_h` in the node profile); filters and queries scope to it.
 
-**Agent-facing operations go in `buzz-cli`**: New agent-facing features belong
-in `buzz-cli` — add a subcommand there first, then wire the REST/WebSocket
-call in `client.rs`. `buzz-dev-mcp` (shell + file tools for `buzz-agent`) is
-separate.
+**Agent-facing operations go in `buzz-cli`**: add a subcommand first, then
+wire the relay call in `client.rs`. `buzz-dev-mcp` (shell + file tools for
+`buzz-agent`) is separate.
 
-**Specs before code**: Design lands in `specs/architecture/` before (or with)
-the implementation. Sovereign-surface changes (declarations, handoffs,
-engrams, replication) must stay consistent with their spec; update the spec in
-the same PR when behavior changes.
-
-**Workflow conditions**: `buzz-workflow` uses
-[evalexpr](https://docs.rs/evalexpr) for condition evaluation. Keep expressions
-simple and testable.
-
-**Thread counters**: `reply_count` and `descendant_count` are materialized on
-thread root events. Any code that inserts replies must update these counters —
-check existing reply handlers for the pattern.
+**Specs before code**: design lands in `specs/architecture/` before (or
+with) the implementation. Sovereign-surface changes (declarations, handoffs,
+engrams, replication) must stay consistent with their spec; update the spec
+in the same PR when behavior changes.
 
 ---
 
@@ -204,16 +155,10 @@ See `crates/buzz-cli/TESTING.md` for the full live-testing runbook.
 ## Testing
 
 ```bash
-just test-unit    # unit tests incl. the Solo center — no infrastructure needed
-just test         # full integration suite (requires Postgres + Redis)
+just test-unit    # core/auth libs + the buzz-local-relay and buzz-cli suites
 just handoff-check graph-check   # sovereign contract suites (relay-free)
+just cloudflare-check
 ```
-
-E2E tests live in `crates/buzz-test-client/tests/`:
-- `e2e_relay.rs` — WebSocket relay protocol
-- `e2e_media.rs` — media upload/download (Blossom)
-- `e2e_media_extended.rs` — extended media scenarios
-- `e2e_nostr_interop.rs` — Nostr interop (NIP-50 search, NIP-10 threads, NIP-17 gift wraps)
 
 See [TESTING.md](TESTING.md) for the live local-relay runbook.
 
@@ -222,10 +167,9 @@ See [TESTING.md](TESTING.md) for the live local-relay runbook.
 ## Common Gotchas
 
 1. **Kind `39000` for channel metadata, not `41`** — kind 41 is NIP-01 (unused). All kinds defined in `buzz-core/src/kind.rs`.
-2. **Relay queries must specify `kinds`** — omitting `kinds` triggers the p-gate (403). Always include explicit kind filters.
-3. **`messages search` must include `--kinds`** — an open-ended search (no kinds) hits the relay p-gate and returns 403. Pass at least `--kinds 9,45001,45003` to scope the query.
-4. **Worktrees: `cd` in the same command** — shell CWD doesn't persist between tool calls. Use `cd /path && cargo build` as one command.
-5. **`echo` with a bare `=`-prefixed word breaks under zsh** — zsh expands `=foo` as a command path. Quote such arguments in scripts meant for interactive shells.
+2. **Scope queries with explicit `kinds`** — relays that enforce hosted-style policy reject open-ended filters; the CLI conventions assume kind-scoped queries everywhere.
+3. **Worktrees: `cd` in the same command** — shell CWD doesn't persist between tool calls. Use `cd /path && cargo build` as one command.
+4. **`echo` with a bare `=`-prefixed word breaks under zsh** — zsh expands `=foo` as a command path. Quote such arguments in scripts meant for interactive shells.
 
 ---
 

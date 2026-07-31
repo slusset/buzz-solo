@@ -30,7 +30,7 @@ pre-push:
     branch-skew:
       run: ./scripts/check-branch-skew.sh
     rust-tests:
-      glob: ["crates/**", "migrations/**", "schema/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", "scripts/run-tests.sh", "justfile"]
+      glob: ["crates/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", "justfile"]
       run: just test-unit
     contracts:
       glob: ["scripts/buzz-ctx*", "scripts/buzz-runner", "scripts/buzz-steward", "scripts/test-buzz-*.sh", "scripts/testdata/**"]

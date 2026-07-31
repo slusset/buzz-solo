@@ -1,5 +1,4 @@
 packages:
-  - "admin-web"
   - "cloudflare/portable-relay"
 allowBuilds:
   esbuild: true

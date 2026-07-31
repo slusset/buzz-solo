@@ -20,19 +20,18 @@ bootstrap:
     node --version &
     pnpm --version &
     wait
-    if ! command -v docker &>/dev/null; then
-        echo "Error: Docker is required but not installed."
-        echo "Install it from https://docs.docker.com/get-docker/"
-        exit 1
-    fi
     if [[ ! -f .env ]]; then
         cp .env.example .env
-        echo "Created .env from .env.example — review it before running just relay."
+        echo "Created .env from .env.example — review it before running just local-relay."
     fi
 
-# Start Docker services, run migrations, install JS deps
+# Bootstrap tools, install JS deps, and install git hooks
 setup: bootstrap
-    ./scripts/dev-setup.sh
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export PATH="{{justfile_directory()}}/bin:$PATH"
+    pnpm install
+    just hooks
 
 # Install git hooks via lefthook (dispatches from the shared .git/hooks dir so all
 # linked worktrees inherit the same hooks without a worktree-relative .hooks path)
@@ -49,23 +48,6 @@ hooks:
     HOOKS_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"
     git config --local core.hooksPath "$HOOKS_DIR"
     lefthook install --force
-
-# Wipe development state and recreate a clean environment
-[confirm("This will DELETE all development data. Continue? (y/N)")]
-reset:
-    ./scripts/dev-reset.sh --yes
-
-# Stop all dev services (keep data)
-down:
-    docker compose down
-
-# Show dev service status
-ps:
-    docker compose ps
-
-# Tail all service logs
-logs *ARGS:
-    docker compose logs -f {{ARGS}}
 
 # ─── Build & Check ───────────────────────────────────────────────────────────
 
@@ -92,76 +74,27 @@ fmt-check:
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 
-# Ensure Docker dev services (Postgres, Redis, etc.) are running and healthy
-_ensure-services:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    pg=$(docker inspect --format '{{"{{"}}.State.Health.Status{{"}}"}}' buzz-postgres 2>/dev/null || echo "not_found")
-    redis=$(docker inspect --format '{{"{{"}}.State.Health.Status{{"}}"}}' buzz-redis 2>/dev/null || echo "not_found")
-    if [[ "$pg" == "healthy" && "$redis" == "healthy" ]]; then
-        echo "Services already healthy"
-        exit 0
-    fi
-    echo "Starting services..."
-    docker compose up -d || true
-    echo -n "Waiting for services"
-    for i in $(seq 1 40); do
-        pg=$(docker inspect --format '{{"{{"}}.State.Health.Status{{"}}"}}' buzz-postgres 2>/dev/null || echo "not_found")
-        redis=$(docker inspect --format '{{"{{"}}.State.Health.Status{{"}}"}}' buzz-redis 2>/dev/null || echo "not_found")
-        if [[ "$pg" == "healthy" && "$redis" == "healthy" ]]; then
-            echo " ready"
-            exit 0
-        fi
-        echo -n "."
-        sleep 3
-    done
-    echo " timed out"
-    exit 1
-
-# Apply database migrations and seed the local dev community if the dev database is running
-_ensure-migrations: _ensure-services
-    cargo run -p buzz-admin -- migrate
-    ./scripts/seed-local-community.sh
-
 # Run all checks suitable for CI / pre-push (no infra needed)
 ci: check test-unit security
 
 # ─── Test ─────────────────────────────────────────────────────────────────────
 
-# Run all tests (unit + integration)
-test:
-    ./scripts/run-tests.sh all
+# Run the test suite (alias for test-unit — no external infrastructure exists)
+test: test-unit
 
-# Run unit tests only (no infra needed)
+# Run unit tests (no infra needed)
 test-unit:
     #!/usr/bin/env bash
+    set -euo pipefail
     if command -v cargo-nextest &>/dev/null; then
         cargo nextest run -p buzz-core -p buzz-auth --lib
         # The Solo center: durable local relay + node CLI. Infra-free
         # (in-process servers on ephemeral ports), so it belongs here.
         cargo nextest run -p buzz-local-relay -p buzz-cli
-        # buzz-db migrator/lint tests: pure SQL-parsing unit tests (no infra).
-        # They guard the embedded-migrator invariant (exactly the consolidated
-        # 0001; cutover/backfill stays an operator script, not startup state)
-        # and the tenant-scoping lints. The Postgres-backed buzz-db tests are
-        # #[ignore]d, so --lib runs only the infra-free set. Without this gate a
-        # stray file in migrations/ or a broken lint ships green.
-        cargo nextest run -p buzz-db --lib
-        # Multi-tenant conformance gate (buzz-conformance): the independent
-        # replay checker + golden fixtures. No infra — pure in-process trace
-        # replay — so it belongs in the unit job. Run all targets (lib + the
-        # tests/replay_fixtures.rs integration test), not just --lib.
-        cargo nextest run -p buzz-conformance
-        # Gateway unit and black-box HTTP tests are infra-free. Postgres-backed
-        # contract/race tests run in the dedicated CI job below.
-        cargo nextest run -p buzz-push-gateway
     else
-        ./scripts/run-tests.sh unit
+        cargo test -p buzz-core -p buzz-auth --lib
+        cargo test -p buzz-local-relay -p buzz-cli
     fi
-
-# Run integration tests only (starts services if needed)
-test-integration:
-    ./scripts/run-tests.sh integration
 
 # Dependency policy (advisories, licenses, sources)
 security:
@@ -169,47 +102,12 @@ security:
 
 # ─── Run ──────────────────────────────────────────────────────────────────────
 
-# Start the lightweight durable relay (no Docker or external services)
+# Start the durable sovereign relay (no external services)
 local-relay *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     export PATH="{{justfile_directory()}}/bin:$PATH"
     cargo run -p buzz-local-relay -- {{ARGS}}
-
-# Start the relay server (auto-starts Docker services if needed)
-relay: bootstrap _ensure-migrations
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export PATH="{{justfile_directory()}}/bin:$PATH"
-    cargo run -p buzz-relay
-
-# Build and run the private read-only admin dashboard
-admin: bootstrap _ensure-migrations
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export PATH="{{justfile_directory()}}/bin:$PATH"
-    [[ -d node_modules ]] || pnpm install
-    pnpm -C admin-web build
-    export BUZZ_ADMIN_HOST="${BUZZ_ADMIN_HOST:-admin.localhost:3000}"
-    export BUZZ_ADMIN_WEB_DIR="${BUZZ_ADMIN_WEB_DIR:-{{justfile_directory()}}/admin-web/dist}"
-    echo "Admin dashboard: http://${BUZZ_ADMIN_HOST}/reports"
-    cargo run -p buzz-relay
-
-# Seed deterministic reports and product feedback for local admin dashboard review
-admin-seed: _ensure-migrations
-    ./scripts/seed-admin-dashboard.sh
-
-# Run focused relay and browser checks for the read-only admin dashboard
-admin-check: fmt-check
-    cargo check -p buzz-relay --all-targets
-    cargo test -p buzz-relay api::admin
-    cargo test -p buzz-relay router::tests
-    pnpm -C admin-web check
-    pnpm -C admin-web exec playwright test
-
-# Start the relay server in release mode
-relay-release: _ensure-migrations
-    cargo run -p buzz-relay --release
 
 # ─── Cloudflare ──────────────────────────────────────────────────────────────
 
@@ -229,11 +127,6 @@ handoff-check:
 graph-check:
     ./scripts/test-buzz-ctx-graph.sh
 
-# ─── Database ─────────────────────────────────────────────────────────────────
-
-# Apply database migrations
-migrate: _ensure-migrations
-
 # ─── Utilities ────────────────────────────────────────────────────────────────
 
 # Remove build artifacts
@@ -246,7 +139,7 @@ check-compile:
 
 # ─── Agent Harness ────────────────────────────────────────────────────────────
 
-# Run a goose agent connected to a Buzz relay (foreground)
+# Run a goose agent connected to a relay (foreground)
 goose relay="ws://localhost:3000" agents="1" heartbeat="0" prompt="" key="$BUZZ_PRIVATE_KEY":
     #!/usr/bin/env bash
     set -euo pipefail

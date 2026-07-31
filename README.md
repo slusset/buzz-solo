@@ -98,15 +98,15 @@ Five lanes, all unconditional: Rust lint, unit tests (including the
 Cloudflare portable-relay checks, and `cargo-deny`. That is the whole
 surface — if CI is green, the node is sound.
 
-## Inherited surfaces
+## Lineage
 
-The desktop, mobile, and web clients left the tree in
-[phase 3 of the peel](specs/architecture/buzz-solo-upstream-peel-v0.1.md) —
-everything removed stays recoverable from git history. The hosted
-multi-tenant relay stack (`buzz-relay` + Postgres/Redis/MinIO, plus the
-`admin-web` dashboard) remains in-tree pending its own decision; the drain
-leg and interop tests still exercise it. `upstream` (`block/buzz`) remains a
-read-only remote for selective cherry-picks.
+The upstream inheritance — desktop, mobile, and web clients, the hosted
+multi-tenant relay stack, and Block's release machinery — was removed in
+[the upstream peel](specs/architecture/buzz-solo-upstream-peel-v0.1.md);
+everything stays recoverable from git history. `upstream` (`block/buzz`)
+remains a read-only remote for selective cherry-picks, and the protocol
+conversation continues at
+[block/buzz#3805](https://github.com/block/buzz/issues/3805).
 
 ---
 

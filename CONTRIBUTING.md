@@ -56,9 +56,8 @@ We review as capacity allows — focused PRs that follow this guide move fastest
 | Tool | Version | Notes |
 |------|---------|-------|
 | Rust | 1.88+ | Install via [rustup](https://rustup.rs/) |
-| Node.js | 24+ | Required for admin-web / Cloudflare checks and `just ci` |
-| pnpm | 10+ | Required for admin-web / Cloudflare checks and `just ci` |
-| Docker | 24+ | For Postgres, Redis, MinIO |
+| Node.js | 24+ | Required for the Cloudflare portable-relay checks and `just ci` |
+| pnpm | 10+ | Required for the Cloudflare portable-relay checks and `just ci` |
 | `just` | latest | Task runner — `cargo install just` |
 | `lefthook` | 2.1.3 (Hermit-pinned) | Auto-installed by `just hooks` — no manual install needed |
 | `sqlx` migrations | workspace crate | `just migrate` applies embedded migrations from `migrations/` |
@@ -99,69 +98,27 @@ Hermit's lazy tool download (each tool is fetched once on first invocation and
 cached thereafter). You can also run `just bootstrap` independently at any time;
 it is safe to re-run.
 
-`just setup` then starts Docker services (Postgres on `:5432`, Redis on `:6379`,
-Adminer on `:8082`, Keycloak on `:8180` for local OAuth/OIDC testing, MinIO on
-`:9000` for media storage, and Prometheus on `:9090` for metrics) and runs all
-pending database migrations.
+`just setup` then installs the JS workspace dependencies (pnpm) and git
+hooks. Nothing else is required — the Solo relay needs no external services.
 
-### Running a Relay
+### Running the Relay
 
 ```bash
 just local-relay   # durable Solo relay — no Docker or external services
-just relay         # hosted relay stack (Postgres/Redis via Docker)
 ```
-
-### Stopping / Resetting
-
-```bash
-just down    # Stop Docker services, keep data
-just reset   # Wipe all dev state and recreate it; installed Buzz is preserved
-```
-
-`just reset` removes the local Docker volumes only. It does not touch the
-sovereign node's `~/.buzz-local` nest or profiles.
 
 ---
 
 ## Running Tests
 
-### Unit Tests (no infrastructure required)
-
 ```bash
-just test-unit
+just test-unit   # buzz-core + buzz-auth libs, buzz-local-relay, buzz-cli
+just handoff-check graph-check   # sovereign contract suites (bash + jq)
 ```
 
-Unit tests are self-contained and run without Docker. They cover event
-parsing, filter matching, auth logic, workflow YAML parsing, and more.
-
-### Integration Tests (requires running infrastructure)
-
-```bash
-just test
-```
-
-Integration tests spin up the relay and exercise the full stack — WebSocket
-connections, NIP-42 auth, event ingestion, search indexing, and workflow
-execution. `just test` starts Docker services automatically if they're not
-already running.
-
-### End-to-End Tests
-
-End-to-end tests live in `crates/buzz-test-client/tests/`:
-
-- `e2e_relay.rs` — WebSocket relay tests
-- `e2e_mcp.rs` — MCP tool tests
-- `e2e_nostr_interop.rs` — Nostr protocol interoperability tests
-- `e2e_media.rs` — media upload/download tests
-- `e2e_media_extended.rs` — extended media tests (GIF, image processing)
-
-Run them with (requires running infrastructure):
-
-```bash
-cargo test -p buzz-test-client -- --ignored
-```
-
-See `TESTING.md` for the live relay + CLI testing runbook.
+All tests are self-contained: the local-relay suites start in-process
+servers on ephemeral ports. See [TESTING.md](TESTING.md) for the live
+relay + CLI runbook.
 
 ### CI Gate
 
@@ -285,10 +242,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and
 [AGENTS.md](AGENTS.md#repo-structure) for the complete crate map. The key
 design principles:
 
-**The relay is the single source of truth.** All state flows through the
-event store. Crates communicate through the database and Redis pub/sub — not
-through direct function calls across crate boundaries (with the exception
-of `buzz-core` types, which are shared everywhere).
+**The journal is the single source of truth.** The sovereign node appends
+verified signed events to a durable log; replicas carry only the streams
+that signed declarations export to them.
 
 **Event kinds are the only switch.** Every action in the system — a message,
 a reaction, a workflow step, a canvas update — is a Nostr event with a kind
@@ -336,83 +292,26 @@ Node runtime releases are signed `node/vX.Y.Z` git tags — see
    }
    ```
 
-3. **Register the kind's required scope** in
-   `crates/buzz-relay/src/handlers/ingest.rs` inside
-   `required_scope_for_kind()`. This controls which auth scope a caller
-   needs to submit the event:
+3. **Handle the kind where it matters** — the local relay
+   (`crates/buzz-local-relay`) for node-side behavior, the CLI
+   (`crates/buzz-cli`) for the agent-facing surface, and the Cloudflare
+   adapter (`cloudflare/portable-relay`) if replicas must understand it.
 
-   ```rust
-   KIND_MY_FEATURE => Ok(Scope::MessagesWrite),
-   ```
+4. **Write tests** — a unit test for payload serialization in `buzz-core`
+   and coverage in the crate that handles the kind.
 
-4. **Handle post-storage side effects** by adding a match arm in
-   `crates/buzz-relay/src/handlers/side_effects.rs` inside
-   `handle_side_effects()`:
-
-   ```rust
-   KIND_MY_FEATURE => handle_my_feature(event, state).await?,
-   ```
-
-   `handle_side_effects()` runs after the event is stored — use it for
-   notifications, cache invalidation, or derived data. If the new kind
-   also needs an HTTP bridge surface (for example, a protocol helper that
-   cannot practically use WebSocket), add a handler in
-   `crates/buzz-relay/src/api/` and register it in
-   `crates/buzz-relay/src/router.rs`.
-
-5. **Persist to the database** — if the event needs to be queryable, add a
-   handler in `buzz-db/src/` (e.g., `buzz-db/src/my_feature.rs`) with
-   the appropriate `INSERT` and `SELECT` queries.
-
-6. **Index for search** (if applicable) — Postgres FTS indexes persisted
-   events automatically via the `events.search_tsv` generated column. To
-   exclude a privacy-sensitive kind from search, add it to the `CASE WHEN
-   kind IN (...)` exclusion in the `search_tsv` definition (see the initial
-   schema migration) rather than wiring a separate indexer.
-
-7. **Audit** — the audit log captures all events automatically; no changes
-   needed unless you need custom audit metadata.
-
-8. **Write tests** — add a unit test for payload serialization in
-   `buzz-core` and an integration test in `buzz-test-client` that sends
-   the new event kind and verifies the expected behavior.
-
-9. **Document** — `kind.rs` is the authoritative registry of all kind numbers.
-   Update `README.md` if it's a user-facing feature.
+5. **Document** — `kind.rs` is the authoritative registry of all kind
+   numbers, and sovereign-surface kinds get (or update) a spec in
+   `specs/architecture/`.
 
 ---
 
-## How to Add a New API Endpoint
+## HTTP Endpoints
 
-Prefer a signed Nostr event and the existing WebSocket/`POST /events` ingest
-path over adding endpoint-specific JSON APIs. The relay intentionally exposes
-only a narrow HTTP surface: NIP-11/NIP-05 metadata, `/events`, `/query`,
-`/count`, `/hooks/{id}`, Blossom media, git smart HTTP, git policy hooks, and
-health probes.
-
-If an HTTP endpoint is still necessary:
-
-1. **Define the handler** in the appropriate module under
-   `crates/buzz-relay/src/api/`. Resolve the request tenant before any auth or
-   data lookup, use NIP-98 when the endpoint accepts user credentials, and keep
-   community scoping explicit.
-
-2. **Register the route** in `crates/buzz-relay/src/router.rs` using the
-   narrowest path possible. Do not add new `/api/*` compatibility routes unless
-   the product decision explicitly calls for one.
-
-3. **Add database queries** in `buzz-db/src/` only when the endpoint cannot be
-   expressed through the existing event query paths.
-
-4. **Handle errors** using the `api_error()`, `internal_error()`, and
-   `not_found()` helpers in `buzz-relay/src/api/mod.rs`. Return
-   `(StatusCode, Json<Value>)` tuples.
-
-5. **Write tests** with the `buzz-test-client` harness in
-   `crates/buzz-test-client/tests/`, covering auth, community scoping, and the
-   relevant success path.
-
-6. **Document** any public endpoint in `ARCHITECTURE.md` and user-facing docs.
+Prefer a signed Nostr event over any new HTTP surface. The local relay
+exposes only the core Nostr event/query surface plus health probes; the
+Cloudflare adapter mirrors it. If you believe something needs HTTP, write
+the spec first (`specs/architecture/`) and raise it in an issue.
 
 ---
 

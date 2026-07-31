@@ -1,6 +1,6 @@
 # Buzz Solo — Upstream Peel & Launch Preparation v0.1
 
-Status: phases 0–3 landed
+Status: phases 0–4 landed — peel complete
 Date: 2026-07-30
 
 ## Motive
@@ -112,9 +112,39 @@ targets now mirror the five CI lanes; `test-unit` gained the Solo suites),
 `cloudflare/portable-relay`), `Dockerfile` (admin bundle only, Solo OCI
 labels), and the docs sweep (AGENTS/CONTRIBUTING/TESTING/ARCHITECTURE).
 
-The hosted relay stack (`buzz-relay`, `buzz-db`, `buzz-pubsub`, …,
-`admin-web/`, `deploy/compose/`, `Dockerfile`) stays — the drain leg and
-interop tests still exercise it — and gets its own decision later.
+The hosted relay stack initially stayed pending its own decision; that
+decision landed as Phase 4 below.
+
+## Phase 4 — hosted stack shutdown (landed)
+
+The owner's decision: the sovereign workflow never touches the hosted
+stack — the laptop node is `buzz-local-relay`, the drain leg is its
+`buzz-relay-pull` bin, and the rendezvous is the Cloudflare adapter — so
+the "shadow relay" retires. Dependency check: every dependent of a
+hosted-stack crate is itself in the hosted stack; the keep-set closure is
+unchanged, and the `mesh-llm` git dependency (source of the original CI
+pin drift) left with `buzz-relay`, its only consumer.
+
+Removed: crates `buzz-relay`, `buzz-db`, `buzz-pubsub`, `buzz-search`,
+`buzz-audit`, `buzz-media`, `buzz-workflow`, `buzz-conformance`,
+`buzz-push-gateway`, `buzz-relay-mesh`, `buzz-admin`, `buzz-test-client`;
+`admin-web/`, `deploy/`, `migrations/`, `schema/`, the Docker files and
+compose stack, `GOVERNANCE.md` (pointed at Block governance), and the
+relay-serving dev scripts (`run-tests.sh` integration lanes, seeds,
+relay launchers, DB maintenance SQL). Workspace `Cargo.toml` shed the
+hosted dependency block (sqlx, redis, iroh, opentelemetry/metrics stacks,
+the aws-creds fork pin, the CI profile). `.env.example`, `justfile`,
+`lefthook.yml`, and the pnpm workspace (now just
+`cloudflare/portable-relay`) were reduced to match, and
+ARCHITECTURE.md/TESTING.md were rewritten as Solo documents.
+
+Kept deliberately: the agent harness (`buzz-acp`, `buzz-agent`,
+`buzz-dev-mcp`, `sprig`), pairing (`buzz-pair-relay`,
+`buzz-pairing-cli`), the nostr git tools, and `examples/` — small,
+buildable, and plausibly part of the Solo agent story; they get their own
+look if they go stale. The local dev Docker stack was shut down before
+the compose file left the tree; its volumes remain until removed manually
+(`docker volume ls | grep buzz`).
 
 ## Non-goals
 
