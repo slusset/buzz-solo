@@ -16,7 +16,7 @@ The write path mirrors NIP-43's admin command shape (`kind:9030`–`9032`): user
 
 ## Motivation
 
-In Buzz the relay *is* the workspace ([VISION.md](../../VISION.md)). A client connected to several relays needs a way to tell them apart that every member sees identically — initials derived from a locally-configured workspace name differ per device and say nothing about the workspace itself.
+In Buzz the relay *is* the workspace. A client connected to several relays needs a way to tell them apart that every member sees identically — initials derived from a locally-configured workspace name differ per device and say nothing about the workspace itself.
 
 Upstream Nostr already standardizes the *read* side of this: NIP-11 defines a first-class `icon` field on the relay information document, fetched with an unauthenticated `GET` + `Accept: application/nostr+json`. This NIP adopts that read path unchanged, so any NIP-11-aware client renders the workspace icon with zero Buzz-specific code.
 

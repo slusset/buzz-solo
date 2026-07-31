@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+# buzz-steward — the read-only steward.
+#
+# An agent principal with observe + report powers and nothing else. On every
+# run it first verifies its own mandate: an ACTIVE owner-signed
+# `steward/<node>` declaration head (kind 30700) naming its pubkey. No
+# mandate, no work — the steward's authority is journal-verified at startup,
+# by the same evaluation rules the adapters enforce.
+#
+# Duties (v0, all observation):
+#   - node health (local sovereign relay + cloud rendezvous)
+#   - governance state per mandated node (journal-governed vs bootstrap,
+#     active head counts per domain)
+#   - agreement drift (open offers, stale admit pins, unscoped heads,
+#     foreign halves without a local matching export)
+#   - delegation state (stale opens/claims and returns awaiting verification)
+#   - custody-exposure notices (mirror-mode exports offered to readers)
+#
+# Reports are ordinary kind-1 events tagged t=steward:report into the
+# shared context, signed with the steward's OWN bound key (NIP-OA
+# capability attached). Unchanged findings are not re-posted: the report
+# body is hashed and compared against the last posted report.
+set -euo pipefail
+
+HOME_DIR="${BUZZ_CTX_HOME:-$HOME/.buzz-local}"
+LOCAL_URL="${BUZZ_CTX_LOCAL:-http://127.0.0.1:7777}"
+CLOUD_URL="${BUZZ_CTX_CLOUD:-https://buzz-portable-relay.ted-slusser-a00.workers.dev}"
+CLIENT="$HOME_DIR/bin/sovereign-client"
+HANDOFF_STATE="${BUZZ_HANDOFF_STATE:-$HOME_DIR/bin/buzz-handoff-state}"
+STEWARD_KEY="$HOME_DIR/agents/steward.key"
+STEWARD_AUTH="$HOME_DIR/agents/steward.auth"
+STATE_DIR="$HOME_DIR/steward"
+OWNER_KEY="$HOME_DIR/node.key"
+MACHINE="$(hostname -s)"
+HANDOFF_AGE_HOURS="${BUZZ_STEWARD_HANDOFF_AGE_HOURS:-24}"
+DRY_RUN="${BUZZ_STEWARD_DRY_RUN:-0}"
+
+die() { echo "buzz-steward: $*" >&2; exit 1; }
+[ -x "$CLIENT" ] || die "missing client at $CLIENT"
+[ -x "$HANDOFF_STATE" ] || die "missing signature-aware handoff reducer at $HANDOFF_STATE"
+[ -f "$STEWARD_KEY" ] || die "no steward key — commission first: buzz-ctx bind-agent steward"
+[ -f "$OWNER_KEY" ] || die "missing owner key at $OWNER_KEY (needed to identify the owner, never to sign)"
+[[ "$HANDOFF_AGE_HOURS" =~ ^[0-9]+$ ]] \
+  || die "BUZZ_STEWARD_HANDOFF_AGE_HOURS must be a non-negative integer"
+STEWARD_PUB="$("$CLIENT" pubkey "$STEWARD_KEY")"
+OWNER_PUB="$("$CLIENT" pubkey "$OWNER_KEY")"
+mkdir -p "$STATE_DIR"
+
+# Observe every mandated node's own journal, not just the nearest one:
+# counterparty halves reach the rendezvous first (or only), and a steward
+# that reads one journal reports offers as open after they were answered.
+# Merged head-reduction keeps the newest event per (author, d) cell.
+query_heads() { # $1 = relay URL; empty output on failure
+  "$CLIENT" query "$STEWARD_KEY" "$1" '[{"kinds":[30700]}]' 2>/dev/null \
+    | sed 's/^200 //' || true
+}
+query_handoffs() { # $1 = relay URL
+  "$CLIENT" query "$STEWARD_KEY" "$1" \
+    '[{"kinds":[1],"#t":["handoff:open","handoff:claim","handoff:return","handoff:close","handoff:ack-invalid"]}]' \
+    2>/dev/null | sed 's/^200 //'
+}
+HEADS="$({ query_heads "$LOCAL_URL"; echo; query_heads "$CLOUD_URL"; } \
+  | jq -cs 'map(select(type == "array")) | add
+            | unique_by(.id)
+            | group_by(.pubkey + ([.tags[] | select(.[0]=="d") | .[1]][0] // .id))
+            | map(max_by(.created_at))')"
+
+# ── Mandate: which nodes am I steward of, with which powers? ───────────────
+# The mandate's declared powers are the contract: "observe" is required to
+# run at all; "report" is required to publish. A mandate that grants less
+# gets less — the steward enforces its own bounds.
+MANDATE_HEADS="$(printf '%s' "$HEADS" | jq -c --arg me "$STEWARD_PUB" --arg owner "$OWNER_PUB" '
+  [.[]
+   | select(.pubkey == $owner)
+   | select([.tags[] | select(.[0]=="d") | .[1]][0] // "" | startswith("steward/"))
+   | select((.content | fromjson).status // "active" == "active")
+   | select([.tags[] | select(.[0]=="p") | .[1]] | index($me) != null)
+   | {node: ([.tags[] | select(.[0]=="n") | .[1]][0]),
+      powers: ((.content | fromjson).powers // []),
+      h: ([.tags[] | select(.[0]=="h") | .[1]][0])}
+   | select(.node != null)]')"
+MANDATES="$(printf '%s' "$MANDATE_HEADS" | jq -c '[.[] | select(.powers | index("observe") != null) | .node] | unique')"
+[ "$(printf '%s' "$MANDATES" | jq 'length')" -gt 0 ] \
+  || die "no active steward mandate with observe power names this key ($STEWARD_PUB) — mint one: buzz-ctx agreement steward <principal> $STEWARD_PUB"
+MAY_REPORT="$(printf '%s' "$MANDATE_HEADS" | jq -r '[.[] | select(.powers | index("report") != null)] | length > 0')"
+CONTEXT_H="$(printf '%s' "$MANDATE_HEADS" | jq -r '[.[] | .h | select(. != null)][0] // empty')"
+
+# ── Observe ────────────────────────────────────────────────────────────────
+# Handoffs are append-only kind-1 events, not addressable heads. Merge both
+# journals by event id only so every lifecycle transition remains visible.
+LOCAL_HANDOFFS="$(query_handoffs "$LOCAL_URL")" \
+  || die "could not read the local handoff view"
+CLOUD_HANDOFFS="$(query_handoffs "$CLOUD_URL")" \
+  || die "could not read the rendezvous handoff view"
+HANDOFFS="$(jq -cn --argjson local "$LOCAL_HANDOFFS" --argjson cloud "$CLOUD_HANDOFFS" \
+  '$local + $cloud | unique_by(.id)')"
+HANDOFF_STATES="$(printf '%s' "$HANDOFFS" | "$HANDOFF_STATE")" \
+  || die "could not reduce signed handoff lifecycles"
+
+health_line() { # $1 label, $2 url
+  if curl -sf --max-time 4 "$2/health" >/dev/null; then
+    echo "- $1: healthy"
+  else
+    echo "- $1: UNREACHABLE"
+  fi
+}
+
+FINDINGS="$(mktemp)"
+{
+  echo "## Health"
+  health_line "ted-laptop ($LOCAL_URL)" "$LOCAL_URL"
+  health_line "cf-rendezvous" "$CLOUD_URL"
+  echo
+  printf '%s' "$HEADS" | jq -r --arg owner "$OWNER_PUB" \
+    --argjson nodes "$MANDATES" --argjson delegations "$HANDOFF_STATES" \
+    --argjson now "$(date +%s)" --argjson handoff_hours "$HANDOFF_AGE_HOURS" '
+    def tag(e; k): [e.tags[] | select(.[0]==k) | .[1]][0];
+    def st(e): ((e.content | fromjson).status // "active");
+    def role(e): (tag(e;"d") // "") | split("/")[0];
+    def stream(e): (tag(e;"d") // "") as $d | $d | ltrimstr(($d | split("/")[0]) + "/");
+    [.[] | select(tag(.;"d") != null)] as $all
+    | [$all[] | select(.pubkey == $owner)] as $mine
+    | [$all[] | select(.pubkey != $owner)] as $foreign
+    | "## Governance",
+      # Per-domain, per the adapters actual evaluation: a domain with no
+      # owner-signed head for the node is unclaimed (bootstrap governs).
+      ( $nodes[] as $node
+        | "- node \($node): " + (
+            ["admit","read","export","steward"]
+            | map(. as $r
+                | [$mine[] | select(tag(.;"n") == $node and role(.) == $r)] as $hs
+                | if ($hs | length) == 0 then "\($r)=unclaimed(bootstrap)"
+                  else "\($r)=\([$hs[] | select(st(.) == "active")] | length)/\($hs | length) journal"
+                  end)
+            | join(" "))
+      ),
+      "",
+      "## Drift",
+      # Open offers: an offer closes only on an ACTIVE admit authored by a
+      # party the export actually offers to. Revoked, unpinned-by-stranger,
+      # or unoffered admits do not close anything.
+      ( [ $mine[]
+          | select(role(.) == "export" and st(.) == "active")
+          | . as $e
+          | stream($e) as $s
+          | [$e.tags[] | select(.[0]=="p") | .[1]] as $offered
+          | [$foreign[]
+             | select(tag(.;"d") == ("admit/" + $s) and st(.) == "active")
+             | .pubkey as $author
+             | select(($offered | index($author)) != null)] as $valid
+          | select(($valid | length) == 0)
+          | "- OFFER OPEN: export/\($s) has no active admit from an offered party" ]
+        | .[] ),
+      # Pin health of admits from offered parties: stale pins drift; a
+      # missing pin is its own finding, not silently tolerated.
+      ( [ $foreign[]
+          | select(role(.) == "admit" and st(.) == "active")
+          | . as $a
+          | stream($a) as $s
+          | ([$mine[] | select(tag(.;"d") == ("export/" + $s) and st(.) == "active")][0]) as $exp
+          | select($exp != null)
+          | ([$exp.tags[] | select(.[0]=="p") | .[1]]) as $offered
+          | if ($offered | index($a.pubkey)) == null then
+              "- UNOFFERED: admit/\($s) by \($a.pubkey[0:12])… who is not an offered party on the export"
+            else
+              ([$a.tags[] | select(.[0]=="e") | .[1]][0]) as $pin
+              | if $pin == null then
+                  "- UNPINNED: admit/\($s) by \($a.pubkey[0:12])… carries no export pin — re-admit required"
+                elif $pin != $exp.id then
+                  "- DRIFT: admit/\($s) by \($a.pubkey[0:12])… pins \($pin[0:12])… but export head is \($exp.id[0:12])… — re-pin required"
+                else empty end
+            end
+          | select(. != null) ]
+        | .[] ),
+      # Unscoped heads govern nothing — likely pre-node-scoping relics.
+      ( [ $mine[]
+          | select(tag(.;"n") == null)
+          | "- UNSCOPED: \(tag(.;"d")) governs no node (missing n tag)" ]
+        | .[] ),
+      "",
+      ( if ($delegations | length) == 0 then empty else
+          "## Delegation",
+          ( [ $delegations[]
+              | select(.state == "OPEN")
+              | select(($now - .created_at) > ($handoff_hours * 3600))
+              | "- STALE OPEN: \(.title) (\(.open_id[0:8])…) unclaimed >\($handoff_hours)h" ]
+            | .[] ),
+          ( [ $delegations[]
+              | select(.state == "CLAIMED")
+              | select(($now - .claim_created_at) > ($handoff_hours * 3600))
+              | "- STALE CLAIM: \(.title) (\(.open_id[0:8])…) by \(.claimant_pubkey[0:12])… >\($handoff_hours)h without return" ]
+            | .[] ),
+          ( [ $delegations[]
+              | select(.state == "RETURNED")
+              | "- AWAITING VERIFY: \(.title) (\(.open_id[0:8])…) returned by \(.claimant_pubkey[0:12])…" ]
+            | .[] ),
+          ( [ $delegations[]
+              | select(.state == "CONFLICT")
+              | "- CLAIM CONFLICT: \(.title) (\(.open_id[0:8])…) has \(.conflicting_claims | length) authorized claimant keys" ]
+            | .[] ),
+          ( [ $delegations[]
+              | select(.state == "INVALID")
+              | "- INVALID LIFECYCLE: \(.title) (\(.open_id[0:8])…) — \(.ignored[0].reason // "invalid open")" ]
+            | .[] ),
+          "- handoffs: \([$delegations[] | select(.state == "OPEN")] | length) open, \([$delegations[] | select(.state == "CLAIMED")] | length) claimed, \([$delegations[] | select(.state == "CONFLICT")] | length) conflicted, \([$delegations[] | select(.state == "RETURNED")] | length) returned-unverified, \([$delegations[] | select(.state == "INVALID")] | length) invalid, \([$delegations[] | select(.state == "ACKNOWLEDGED_INVALID")] | length) acknowledged-invalid",
+          ""
+        end ),
+      "## Custody exposure",
+      ( [ $mine[]
+          | select(role(.) == "export" and st(.) == "active")
+          | select(((.content | fromjson).selection // {}) | .mirror == true)
+          | "- NOTE: export/\(stream(.)) is a WHOLE-JOURNAL mirror offered to \([.tags[] | select(.[0]=="p")] | length) reader key(s)" ]
+        | .[] )
+  '
+} > "$FINDINGS"
+
+# ── Report (deduped, powers-gated) ─────────────────────────────────────────
+if [ "$DRY_RUN" = "1" ]; then
+  echo "steward: dry run — findings were not published"
+  cat "$FINDINGS"
+  rm -f "$FINDINGS"
+  exit 0
+fi
+if [ "$MAY_REPORT" != "true" ]; then
+  echo "steward: no mandate grants report power — observing only, nothing published"
+  cat "$FINDINGS"
+  rm -f "$FINDINGS"
+  exit 0
+fi
+DIGEST="$(shasum -a 256 "$FINDINGS" | awk '{print $1}')"
+LAST="$(cat "$STATE_DIR/last-report.sha" 2>/dev/null || true)"
+if [ "$DIGEST" = "$LAST" ]; then
+  echo "steward: findings unchanged since last report ($DIGEST) — nothing to post"
+  cat "$FINDINGS"
+  rm -f "$FINDINGS"
+  exit 0
+fi
+
+BODY="$(printf 'STEWARD REPORT (%s@%s)\nmandates: %s\n\n%s' \
+  "steward" "$MACHINE" "$(printf '%s' "$MANDATES" | jq -r 'join(", ")')" \
+  "$(cat "$FINDINGS")")"
+AUTH_TAG="$(cat "$STEWARD_AUTH" 2>/dev/null || echo null)"
+EVENT="$(jq -n --arg pk "$STEWARD_PUB" --arg c "$BODY" --arg machine "$MACHINE" \
+  --arg ts "$(date +%s)" --argjson auth "$AUTH_TAG" --argjson nodes "$MANDATES" \
+  --arg h "$CONTEXT_H" \
+  '{pubkey:$pk, created_at:($ts|tonumber), kind:1,
+    tags:([["t","steward:report"],["agent","steward"],["machine",$machine]]
+          + (if $h == "" then [] else [["h",$h]] end)
+          + ($nodes | map(["n", .]))
+          + (if $auth == null then [] else [$auth] end)),
+    content:$c}')"
+
+WRITE_RELAY="$LOCAL_URL"
+curl -sf --max-time 2 "$WRITE_RELAY/health" >/dev/null \
+  || die "local sovereign node unreachable — reports go to the source of truth"
+TMP="$(mktemp)"; printf '%s' "$EVENT" > "$TMP"
+"$CLIENT" post "$STEWARD_KEY" "$WRITE_RELAY" "$TMP" >/dev/null
+rm -f "$TMP"
+echo "$DIGEST" > "$STATE_DIR/last-report.sha"
+echo "steward: report posted (steward-signed, $(wc -c < "$FINDINGS" | tr -d ' ') bytes of findings)"
+
+# Host-surface voice: raise a native notification when (and only when) a new
+# report posts. Env-gated so the same script runs headless elsewhere. The
+# notification body is built from counts only — no report text crosses into
+# the osascript string.
+if [ "${BUZZ_STEWARD_NOTIFY:-}" = "1" ] && command -v osascript >/dev/null; then
+  offers="$(grep -c '^- OFFER OPEN' "$FINDINGS" || true)"
+  drift="$(grep -c '^- DRIFT' "$FINDINGS" || true)"
+  unscoped="$(grep -c '^- UNSCOPED' "$FINDINGS" || true)"
+  down="$(grep -c 'UNREACHABLE' "$FINDINGS" || true)"
+  summary="offers open: $offers, drift: $drift, unscoped: $unscoped"
+  [ "$down" -gt 0 ] && summary="⚠ $down node(s) UNREACHABLE — $summary"
+  osascript -e "display notification \"$summary\" with title \"Buzz Steward\" subtitle \"new report in the journal\"" || true
+fi
+cat "$FINDINGS"
+rm -f "$FINDINGS"

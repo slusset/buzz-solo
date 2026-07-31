@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Compatibility launcher for the managed, profile-driven context CLI.
+#
+# All identity, path, relay, migration, and lifecycle behavior lives in the
+# versioned Rust implementation behind `buzz context`. This file translates
+# only the few historical command spellings that predate that command group.
+set -euo pipefail
+
+BUZZ_CONTEXT_BIN="${BUZZ_CONTEXT_BIN:-buzz}"
+
+case "${1:-}" in
+  artifact)
+    shift
+    exec "$BUZZ_CONTEXT_BIN" context artifact put "$@"
+    ;;
+  announce)
+    shift
+    exec "$BUZZ_CONTEXT_BIN" context artifact announce "$@"
+    ;;
+  fetch)
+    shift
+    exec "$BUZZ_CONTEXT_BIN" context artifact get "$@"
+    ;;
+  share)
+    shift
+    if [ "${1:-}" = "-m" ]; then
+      shift
+      exec "$BUZZ_CONTEXT_BIN" context share --message "${1:?message required after -m}"
+    fi
+    exec "$BUZZ_CONTEXT_BIN" context share "$@"
+    ;;
+  "")
+    exec "$BUZZ_CONTEXT_BIN" context --help
+    ;;
+  *)
+    exec "$BUZZ_CONTEXT_BIN" context "$@"
+    ;;
+esac

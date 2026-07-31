@@ -1,0 +1,308 @@
+id: bounded-attention-context
+type: model
+entity: BoundedAttentionContext
+aggregate: BoundedAttentionContext
+description: |
+  Represents one bounded context as the unit of a builder's attention on a
+  single sovereign node: an h-scoped set of signed events whose addressable
+  head cells hold current understanding and whose regular events hold
+  attention residue. The brief, the attention cursor, and freshness are
+  derived by deterministic projection — never stored. Node relationships,
+  cross-node context mapping, and navigation by question are out of scope.
+
+sources:
+  stories:
+    - specs/stories/sticky-attention/re-enter-with-a-context-brief.md
+    - specs/stories/sticky-attention/accrete-attention-residue.md
+    - specs/stories/sticky-attention/distill-a-context-head.md
+    - specs/stories/sticky-attention/attribute-context-contributions.md
+    - specs/stories/sticky-attention/bind-agent-session-to-context.md
+    - specs/stories/sticky-attention/record-agent-session-lifecycle.md
+    - specs/stories/sticky-attention/checkpoint-durable-context.md
+  journeys:
+    - specs/journeys/re-enter-a-bounded-context.md
+    - specs/journeys/maintain-a-durable-context-through-agent-sessions.md
+
+identity:
+  fields: [context_id]
+  description: |
+    A bounded context is identified by exactly one NIP-29 h identifier on
+    one node. The boundary is the h tag, not a slug namespace: heads,
+    residue, lifecycle events, and artifact references are members only if
+    they carry it.
+
+attributes:
+  context_id:
+    type: SharedContextId
+    required: true
+    immutable: true
+  title:
+    type: string
+    required: true
+    description: Human name for recognition-based selection; not an address.
+  heads:
+    type: list<HeadCell>
+    required: true
+    derived: true
+    description: |
+      Current understanding: newest addressable event per (author, kind, d)
+      within the boundary.
+  residue:
+    type: list<ResidueRecord>
+    required: true
+    derived: true
+    description: Append-only attention history within the boundary.
+  attention_cursor:
+    type: EventId
+    required: false
+    derived: true
+    description: |
+      The newest residue record authored by one of the builder's own
+      attested agents. Steward and counterpart records never move it.
+      Absent in a context the builder has not yet touched.
+  freshness:
+    type: enum
+    required: true
+    derived: true
+    values: [fresh, accreting, stale, cold]
+    see: bounded-attention-context.lifecycle.yaml
+  last_touch:
+    type: timestamp
+    required: false
+    derived: true
+    description: Timestamp of the attention cursor; orders contexts by warmth.
+  participants:
+    type: list<AttributedIdentity>
+    required: true
+    derived: true
+    description: Every signing identity observed in the boundary, classed.
+  active_sessions:
+    type: list<AgentSession>
+    required: true
+    derived: true
+    description: |
+      Session starts in this boundary with neither a completion nor an
+      interruption record.
+  artifact_manifest_head:
+    type: ArtifactManifestHead
+    required: false
+    derived: true
+    description: |
+      The newest accepted manifest replacement for this context. Absence means
+      the context has not checkpointed filesystem artifacts.
+
+entities:
+  - name: HeadCell
+    identity: [author, kind, d_tag]
+    replacement_semantics: parameterized_replaceable_head
+    attributes:
+      - event_id
+      - context_id
+      - author
+      - proposed_by_agent
+      - created_at
+      - content
+    description: |
+      One named cell of current understanding. Replacement never destroys
+      residue; history remains replayable beneath every distillation.
+  - name: ResidueRecord
+    identity: event_id
+    immutable: true
+    attributes:
+      - event_id
+      - context_id
+      - author
+      - agent_label
+      - machine_label
+      - attestation
+      - created_at
+      - content
+    description: |
+      A signed record left as a side effect of working: a decision, a
+      landing, a reversal, a note. Labels are presentation metadata.
+  - name: ContextBrief
+    identity: [context_id, projected_over_event_set]
+    derived: true
+    attributes:
+      - current_understanding
+      - live_thread
+      - open_loops
+      - changes_since_cursor
+    description: |
+      The deterministic projection rendered at re-entry. Same events, same
+      brief, on every surface. Never persisted as authority — always
+      recomputable.
+  - name: ContextBinding
+    identity: [context_id, harness_adapter_id, harness_session_id]
+    immutable: true
+    attributes:
+      - context_id
+      - harness_session_id
+      - harness_adapter_id
+      - matched_working_directory
+      - matched_role
+      - resolved_at
+    description: |
+      A unique association resolved from context-owned opt-in configuration.
+      Zero or multiple matches fail closed and produce no lifecycle residue.
+  - name: AgentSession
+    identity: [context_id, harness_adapter_id, harness_session_id]
+    attributes:
+      - context_id
+      - harness_session_id
+      - harness_adapter_id
+      - working_directory
+      - started_at
+      - ended_at
+      - interrupted_at
+      - completion_reason
+      - abandonment_evidence
+      - lifecycle_state
+    description: |
+      Metadata-only lifecycle evidence for one harness session. Prompts,
+      responses, transcripts, credentials, error bodies, and final messages
+      are not session attributes.
+  - name: ArtifactManifestHead
+    identity: [context_id, manifest_name]
+    replacement_semantics: parameterized_replaceable_head
+    attributes:
+      - context_id
+      - manifest_name
+      - checkpoint_id
+      - created_at
+      - artifacts
+      - repository_snapshots
+      - removal_tombstones
+    description: |
+      Current local inventory written after all accepted artifact events and
+      tombstones. Repository snapshots contain sanitized remote, branch, and
+      commit metadata only.
+
+value_objects:
+  - name: SharedContextId
+    representation: nip29_h_tag
+  - name: EventId
+    representation: lowercase_hex_sha256
+  - name: AttributedIdentity
+    representation: [nostr_public_key, contributor_class, attestation_status]
+    purpose: |
+      contributor_class is one of builder_agent, steward, counterpart,
+      unknown; attestation_status is one of verified, unverified. Both are
+      derived from signatures and current attestations, never from labels.
+  - name: OpenLoop
+    representation: [kind_of_obligation, event_id, counterparty]
+    purpose: |
+      An undischarged obligation visible inside the boundary: a claimed
+      handoff, an unanswered offer, a standing question.
+  - name: HarnessAdapterId
+    representation: stable_string
+    purpose: Names the portable integration implementation, not the context.
+  - name: SessionLifecycleState
+    representation: enum
+    values: [active, completed, interrupted]
+  - name: ArtifactDigest
+    representation: lowercase_hex_sha256
+    purpose: Names accepted immutable artifact bytes without embedding them.
+
+commands:
+  - name: ListContextsByWarmth
+    actor: any_surface
+    input: [builder_agent_keys]
+    output: contexts_ordered_by_last_touch
+  - name: ProjectBrief
+    actor: any_surface
+    input: [context_id, builder_agent_keys]
+    output: context_brief_with_provenance
+    description: Reads only the local sovereign relay.
+  - name: AppendResidue
+    actor: builder_attested_agent
+    input: [context_id, content]
+    output: residue_record
+    preconditions:
+      - record carries the context h boundary
+      - signer attaches its owner attestation
+  - name: DistillHead
+    actor: builder_attested_agent
+    input: [context_id, residue_since_previous_head]
+    output: proposed_head_cell
+    description: Proposed by the agent, accepted by the builder.
+  - name: EvaluateFreshness
+    input: [head_timestamps, newest_residue_timestamp, attention_cursor]
+    output: freshness
+  - name: ResolveContextBinding
+    actor: harness_adapter
+    input: [working_directory, harness_session_id, enabled_contexts]
+    output: unique_context_binding
+    failure:
+      - no_enabled_context_matches
+      - multiple_enabled_contexts_match
+  - name: RecordSessionStart
+    actor: harness_adapter
+    input: [context_binding, harness_adapter_id, started_at]
+    output: active_agent_session
+  - name: RecordSessionEnd
+    actor: harness_adapter
+    input: [context_binding, ended_at, completion_reason]
+    output: completed_agent_session
+  - name: ReconcileInterruptedSession
+    actor: harness_adapter
+    input: [active_agent_session, observed_at, abandonment_evidence]
+    output: interrupted_agent_session
+  - name: InspectContextDrift
+    actor: builder_attested_agent
+    input: [context_id]
+    output: changed_removed_and_untracked_artifacts
+    description: Read-only; never creates residue or replaces a manifest.
+  - name: CheckpointContextArtifacts
+    actor: builder_attested_agent
+    input: [context_id, accepted_artifact_drift, checkpoint_label]
+    output: artifact_manifest_head
+    preconditions:
+      - inventory does not follow symbolic-link targets
+      - configured sensitive filenames and content are rejected
+      - binary and oversized files are rejected
+      - repository contents remain outside the artifact inventory
+
+rules:
+  - id: boundary-is-h
+    description: Membership in a bounded context is carried by the h tag; slug namespaces are legacy state awaiting migration, not boundaries.
+    enforced: domain
+  - id: cursor-from-own-agents-only
+    description: The attention cursor derives from the builder's own attested agents' records; foreign identities never move it.
+    enforced: domain
+  - id: projection-is-deterministic
+    description: The same event set produces the same brief on every surface; the brief is recomputable and never stored as authority.
+    enforced: domain
+  - id: provenance-from-signatures
+    description: Contributor class and verification status derive from signatures and current attestations; labels are display only.
+    enforced: domain
+  - id: distillation-preserves-history
+    description: Replacing a head cell never removes residue.
+    enforced: domain
+  - id: single-node-only
+    description: Projection, accretion, and distillation consult only the local sovereign relay; software reaches other machines by ordinary distribution.
+    enforced: domain
+  - id: context-policy-is-authoritative
+    description: Harness adapters consume context-owned identity and opt-in policy; adapter code never supplies or overrides a context identity.
+    enforced: domain
+  - id: binding-fails-closed
+    description: A session binds only when exactly one enabled context claims its working directory, directly or through a declared linked-directory role.
+    enforced: domain
+  - id: session-identity-is-namespaced
+    description: Agent sessions are identified by context, harness adapter, and harness-local session ID.
+    enforced: domain
+  - id: lifecycle-is-metadata-only
+    description: Session lifecycle residue contains only context-approved metadata and excludes prompts, responses, transcripts, credentials, error bodies, and final messages.
+    enforced: domain
+  - id: interruption-is-reconciled
+    description: A later session marks an older active session as interrupted only with positive abandonment evidence; unverifiable sessions remain visibly active.
+    enforced: domain
+  - id: checkpoint-is-manifest-last
+    description: Accepted artifact events and removal tombstones are durable before the manifest head is replaced.
+    enforced: domain
+  - id: repository-snapshots-are-metadata-only
+    description: Linked repositories contribute sanitized remote, branch, and commit metadata; credentials and working-tree contents are excluded.
+    enforced: domain
+  - id: local-does-not-mean-published
+    description: Lifecycle capture, reconciliation, status, and checkpoint commands never imply replication, synchronization, or publication.
+    enforced: domain

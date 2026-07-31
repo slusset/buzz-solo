@@ -1,0 +1,50 @@
+# Domain Model Glossary
+
+| Term | Meaning |
+| --- | --- |
+| Local relay | A single-process, one-community Buzz node intended for local experimentation. |
+| Signed event | A Nostr event whose ID and Schnorr signature verify. |
+| Durable event | A signed event outside the NIP-01 ephemeral kind range. |
+| Effective event | The event currently visible after replaceable-event rules are applied. |
+| Event log | An append-only newline-delimited JSON record of accepted durable events. |
+| Subscription | A client-selected set of Nostr filters receiving historical and live matching events. |
+| Stable node | A node whose acknowledged durable history survives restart and remains attributable. |
+| Portable relay core | Deterministic verification, classification, reduction, and filter behavior shared by relay adapters. |
+| Port | A required relay effect whose implementation varies by runtime. |
+| Adapter | A runtime-specific implementation of transport, storage, subscription, policy, or effects. |
+| Event journal | The source of accepted durable history, independent of its storage representation. |
+| Relay decision | The normative result of submission: stored, duplicate, superseded, ephemeral, or rejected. |
+| Conformance profile | A named set of observable relay guarantees implemented and tested by an adapter. |
+| Replication source | A durable-history port that exports exact signed events in journal order. |
+| Replication cursor | An opaque position interpreted only by the source stream that issued it. |
+| Replication sink | A destination port that independently applies source policy, verification, and normal ingest. |
+| Checkpoint-safe receipt | A terminal destination outcome after which an orchestrator may persist the source cursor. |
+| Event author | The Nostr public key whose signature covers an event's exact envelope. |
+| Principal | A person, agent, relay node, or system identity recognized by local security policy. |
+| Authenticated principal | An ephemeral, audience-bound result proving current control of an authorized verification method. |
+| Append context | The declared origin of an append: direct, replication, or system. |
+| Relay node principal | A stable node identifier, potentially a DID, whose active verification keys may rotate. |
+| Peer binding | Destination-controlled configuration binding one replication source to an authenticated relay node principal. |
+| Delegation | A cryptographically verified, scoped grant allowing a principal to act under explicitly stated conditions. |
+| Read authorization | Request-level and per-event policy applied consistently to query, count, historical, and live delivery. |
+| Stable node key | A normalized operator-controlled routing identifier selecting one logical relay state boundary; it is not a credential. |
+| Coordination atom | The smallest logical unit whose ordering and mutable state meet in one stateful runtime instance. |
+| Cloudflare relay adapter | A portable relay implementation using Worker ingress and one SQLite-backed Durable Object per stable node. |
+| Conformance tier | One evidence environment: deterministic kernel, local Workers runtime, or deployed preview. |
+| Object eviction | Removal of a Durable Object's in-memory instance while its durable storage remains available for reconstruction. |
+| Sovereign owner | The application identity authorized to sign policy declarations for one or more nodes. |
+| Node principal | A stable identity naming an operated node independently of its rotating transport keys. |
+| Transport verification key | A key used to authenticate replication reads or deliveries; it does not own policy or event content. |
+| Event stream | One immutable selection of signed events identified by a stream ID. |
+| Stream export | A source-owner declaration offering an event stream to named counterparty owners. |
+| Stream admit | A destination-owner declaration accepting a pinned export and naming transport keys allowed at its sink. |
+| Stream read grant | A source- or custodian-owner declaration allowing named transport keys to drain an export. |
+| Stream agreement | A current matched export/admit pair expressing mutual owner intent independently of transport readiness. |
+| Shared context | A human-visible NIP-29 space identified by an `h` tag; it may be carried by one or more event streams. |
+| Artifact reference | An `x` tag from an accepted event to immutable bytes named by SHA-256. |
+| Rendezvous custodian | A node that holds and relays selected events or referenced artifacts without becoming their author or policy owner. |
+| Steward mandate | An owner-signed grant allowing an agent to observe and optionally report without changing configuration. |
+| Harness adapter | A host integration that translates agent-session callbacks and tools into bounded-context commands without owning context identity or policy. |
+| Context binding | The unique, fail-closed association between one harness session and one opted-in bounded context. |
+| Lifecycle residue | Metadata-only start, completion, or interruption evidence written for an agent session inside its context boundary. |
+| Context checkpoint | A local, manifest-last replacement that records accepted artifact drift and repository metadata without implying publication. |

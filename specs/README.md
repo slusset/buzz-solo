@@ -1,0 +1,96 @@
+# Buzz Specifications
+
+This directory is the durable design memory for Buzz work. It connects the
+project's purpose to concrete behavior before implementation:
+
+```text
+TELOS.md
+  -> personas and journeys
+  -> stories
+  -> domain models
+  -> executable behavior
+  -> transport contracts
+```
+
+The first vertical slice is the local relay: a single-process Buzz node that
+preserves signed events on a laptop without Postgres, Redis, MinIO, or Docker.
+The portable relay boundary separates that observable behavior from its
+runtime adapters so the same signed-event vocabulary can later run on a
+cloud-native node or the hosted relay. The first independent cloud adapter is
+specified for a Worker and one SQLite-backed Durable Object per stable relay
+node.
+
+## Index
+
+- [Telos](TELOS.md)
+- [Local-first builder persona](personas/local-first-builder.md)
+- [Start a durable local Buzz journey](journeys/start-durable-local-buzz.md)
+- [Run without hosted infrastructure story](stories/local-relay/run-without-hosted-infrastructure.md)
+- [Local event log model](models/local-event-log/local-event-log.model.yaml)
+- [Durable local event log behavior](features/local-relay/durable-local-event-log.feature)
+- [HTTP bridge contract](contracts/openapi/local-relay.yaml)
+- [WebSocket contract](contracts/asyncapi/local-relay.yaml)
+- [Portable relay boundary](architecture/portable-relay-boundary.md)
+- [Portable relay model](models/portable-relay/portable-relay-boundary.model.yaml)
+- [Adapter conformance behavior](features/portable-relay/adapter-conformance.feature)
+- [Core conformance vector](fixtures/portable-relay/core-v0.1.json)
+- [Replication conformance vector](fixtures/portable-relay/replication-v0.1.json)
+- [Artifact conformance behavior](features/portable-relay/artifact-conformance.feature)
+- [Artifact conformance vector](fixtures/portable-relay/artifacts-v0.1.json)
+- [Portable relay identity profile](architecture/portable-relay-identity-v0.1.md)
+- [Attributable access story](stories/portable-relay/control-attributable-access.md)
+- [Portable identity model](models/portable-relay/portable-relay-identity.model.yaml)
+- [Identity conformance behavior](features/portable-relay/identity-conformance.feature)
+- [Identity conformance vector](fixtures/portable-relay/identity-v0.1.json)
+- [Portable relay capability](capabilities/portable-relay.capability.yaml)
+- [Promote a relay to Cloudflare journey](journeys/promote-portable-relay-to-cloudflare.md)
+- [Cloudflare portability story](stories/portable-relay/prove-cloudflare-portability.md)
+- [Portable relay Cloudflare architecture](architecture/portable-relay-cloudflare-v0.1.md)
+- [Cloudflare adapter model](models/portable-relay/portable-relay-cloudflare.model.yaml)
+- [Cloudflare conformance behavior](features/portable-relay/cloudflare-conformance.feature)
+- [Cloudflare conformance vector](fixtures/portable-relay/cloudflare-v0.1.json)
+- [Cloudflare adapter capability](capabilities/portable-relay-cloudflare.capability.yaml)
+- [Portable relay conformance evidence](evidence/portable-relay/README.md)
+- [Sovereign sync agreement (draft)](architecture/sovereign-sync-agreement-v0.1-draft.md)
+- [Sovereign node operator persona](personas/sovereign-node-operator.md)
+- [Offer and accept a sovereign event stream journey](journeys/offer-and-accept-sovereign-event-stream.md)
+- [Replicate a shared context through rendezvous journey](journeys/replicate-shared-context-through-rendezvous.md)
+- [Fetch referenced stream artifacts journey](journeys/fetch-referenced-stream-artifacts.md)
+- [Detect and reconcile stream drift journey](journeys/detect-and-reconcile-stream-drift.md)
+- [Sovereign stream agreement model](models/sovereign-sync/sovereign-stream-agreement.model.yaml)
+- [Sovereign agreement lifecycle](models/sovereign-sync/sovereign-stream-agreement.lifecycle.yaml)
+- [Stream agreement behavior](features/sovereign-sync/stream-agreement.feature)
+- [Shared-context replication behavior](features/sovereign-sync/shared-context-replication.feature)
+- [Referenced artifact custody behavior](features/sovereign-sync/referenced-artifact-custody.feature)
+- [Steward drift behavior](features/sovereign-sync/steward-drift.feature)
+- [Sovereign sync HTTP contract](contracts/openapi/sovereign-sync.yaml)
+- [Sovereign sync capability](capabilities/sovereign-sync-agreements.capability.yaml)
+- [Delegate work through a journal handoff journey](journeys/delegate-work-through-journal-handoff.md)
+- [Return and close delegated work journey](journeys/return-and-close-delegated-work.md)
+- [Open an attributable work offer story](stories/journal-handoff/open-attributable-work-offer.md)
+- [Claim delegated work exclusively story](stories/journal-handoff/claim-delegated-work-exclusively.md)
+- [Return verifiable work evidence story](stories/journal-handoff/return-verifiable-work-evidence.md)
+- [Close a verified handoff story](stories/journal-handoff/close-verified-handoff.md)
+- [Journal handoff model](models/journal-handoff/journal-handoff.model.yaml)
+- [Journal handoff lifecycle](models/journal-handoff/journal-handoff.lifecycle.yaml)
+- [Handoff lifecycle behavior](features/journal-handoff/handoff-lifecycle.feature)
+- [Journal handoff architecture](architecture/journal-handoff-v0.1.md)
+- [Sovereign builder persona](personas/sovereign-builder.md)
+- [Re-enter a bounded context journey](journeys/re-enter-a-bounded-context.md)
+- [Re-enter with a context brief story](stories/sticky-attention/re-enter-with-a-context-brief.md)
+- [Accrete attention residue story](stories/sticky-attention/accrete-attention-residue.md)
+- [Distill a context head story](stories/sticky-attention/distill-a-context-head.md)
+- [Attribute context contributions story](stories/sticky-attention/attribute-context-contributions.md)
+- [Bounded attention context model](models/sticky-attention/bounded-attention-context.model.yaml)
+- [Bounded attention context lifecycle](models/sticky-attention/bounded-attention-context.lifecycle.yaml)
+- [Context brief behavior](features/sticky-attention/context-brief.feature)
+- [Maintain a durable context through agent sessions journey](journeys/maintain-a-durable-context-through-agent-sessions.md)
+- [Bind an agent session to one context story](stories/sticky-attention/bind-agent-session-to-context.md)
+- [Record agent-session lifecycle story](stories/sticky-attention/record-agent-session-lifecycle.md)
+- [Checkpoint a durable context story](stories/sticky-attention/checkpoint-durable-context.md)
+- [Agent-session lifecycle model](models/sticky-attention/agent-session.lifecycle.yaml)
+- [Durable-context hooks contract](contracts/agent-harness/durable-context-hooks.yaml)
+- [Portable agent-session behavior](features/sticky-attention/agent-session-lifecycle.feature)
+- [Sticky attention capability](capabilities/sticky-attention.capability.yaml)
+- [Node release distribution](architecture/node-release-distribution-v0.1.md)
+- [Sovereign sync realtime (draft)](architecture/sovereign-sync-realtime-v0.2-draft.md)

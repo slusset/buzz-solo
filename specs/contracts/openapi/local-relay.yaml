@@ -1,0 +1,164 @@
+openapi: 3.1.0
+info:
+  title: Buzz Portable Relay HTTP Bridge
+  version: 0.1.0
+  description: |
+    Minimal HTTP bridge shared by portable relay adapters. Listener placement
+    and authentication policy are adapter-specific.
+servers:
+  - url: http://127.0.0.1:8787
+    description: Local adapter
+  - url: https://{relayHost}
+    description: Deployed adapter
+    variables:
+      relayHost:
+        default: relay.example
+paths:
+  /health:
+    get:
+      operationId: localRelayHealth
+      x-story: specs/stories/local-relay/run-without-hosted-infrastructure.md
+      x-feature: specs/features/local-relay/durable-local-event-log.feature
+      x-journey: specs/journeys/start-durable-local-buzz.md
+      x-adapter-conformance:
+        - story: specs/stories/portable-relay/prove-cloudflare-portability.md
+          feature: specs/features/portable-relay/cloudflare-conformance.feature
+          journey: specs/journeys/promote-portable-relay-to-cloudflare.md
+      responses:
+        "200":
+          description: Relay is ready.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    const: ok
+  /events:
+    post:
+      operationId: submitLocalEvent
+      x-story: specs/stories/local-relay/run-without-hosted-infrastructure.md
+      x-feature: specs/features/portable-relay/adapter-conformance.feature
+      x-journey: specs/journeys/start-durable-local-buzz.md
+      x-adapter-conformance:
+        - story: specs/stories/portable-relay/prove-cloudflare-portability.md
+          feature: specs/features/portable-relay/cloudflare-conformance.feature
+          journey: specs/journeys/promote-portable-relay-to-cloudflare.md
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NostrEvent"
+      responses:
+        "200":
+          description: Event verification and persistence outcome.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WriteResult"
+        "400":
+          description: Malformed event.
+  /query:
+    post:
+      operationId: queryLocalEvents
+      x-story: specs/stories/local-relay/run-without-hosted-infrastructure.md
+      x-feature: specs/features/portable-relay/adapter-conformance.feature
+      x-journey: specs/journeys/start-durable-local-buzz.md
+      x-adapter-conformance:
+        - story: specs/stories/portable-relay/prove-cloudflare-portability.md
+          feature: specs/features/portable-relay/cloudflare-conformance.feature
+          journey: specs/journeys/promote-portable-relay-to-cloudflare.md
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+      responses:
+        "200":
+          description: Matching effective events, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NostrEvent"
+        "400":
+          description: A filter requests an unsupported hosted-only capability such as NIP-50 search.
+  /count:
+    post:
+      operationId: countLocalEvents
+      x-story: specs/stories/local-relay/run-without-hosted-infrastructure.md
+      x-feature: specs/features/portable-relay/adapter-conformance.feature
+      x-journey: specs/journeys/start-durable-local-buzz.md
+      x-adapter-conformance:
+        - story: specs/stories/portable-relay/prove-cloudflare-portability.md
+          feature: specs/features/portable-relay/cloudflare-conformance.feature
+          journey: specs/journeys/promote-portable-relay-to-cloudflare.md
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+      responses:
+        "200":
+          description: Number of matching effective events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+        "400":
+          description: A filter requests an unsupported hosted-only capability such as NIP-50 search.
+components:
+  schemas:
+    NostrEvent:
+      type: object
+      required: [id, pubkey, created_at, kind, tags, content, sig]
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        pubkey:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        created_at:
+          type: integer
+        kind:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        tags:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        content:
+          type: string
+        sig:
+          type: string
+          pattern: "^[0-9a-f]{128}$"
+    WriteResult:
+      type: object
+      required: [event_id, accepted, message]
+      properties:
+        event_id:
+          type: string
+        accepted:
+          type: boolean
+        message:
+          type: string

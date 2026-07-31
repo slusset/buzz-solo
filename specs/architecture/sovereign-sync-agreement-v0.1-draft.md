@@ -1,0 +1,388 @@
+# Sovereign Sync Agreement v0.1 (draft)
+
+Status: draft for discussion; partially implemented in the portable relay
+adapters and not yet upstreamed. Kind numbers are provisional pending assignment
+in the shared registry (`buzz-core/src/kind.rs`). The IDD source for operator
+experience and testable behavior is
+`specs/capabilities/sovereign-sync-agreements.capability.yaml`; this document
+defines the supporting mechanism and vocabulary.
+
+## Scope
+
+A sync agreement governs a **selection of signed events**. It does not package
+artifact bytes and it is not itself a shared context:
+
+- an **event stream** is one immutable filter, mirror, or upstream-source
+  selection identified by a stream ID;
+- a **shared context** is a human-visible NIP-29 space identified by an `h` tag
+  and may be carried by an event stream;
+- an **artifact** is immutable content named by a SHA-256 `x` tag on an accepted
+  event and transferred separately under access inherited from that reference.
+
+## Decision
+
+A **sync agreement** is not a new protocol object. It is a matched pair of
+signed **sync declarations** — one published by each sovereign party — whose
+contents are compatible and which pin one another. Replication between the
+parties is already governed by the portable replication and identity
+profiles; the agreement layer makes the *governance itself* durable,
+attributable, and observable.
+
+This replaces nothing at the transport boundary. Peer evidence (NIP-98/NIP-42)
+still authenticates every session; destination policy still admits every
+record; declarations are names and intent, never credentials.
+
+## Identity roles
+
+The vocabulary intentionally keeps five roles distinct:
+
+1. **Owner identity** signs declarations and controls one node's policy.
+2. **Node principal** is a stable operator label whose transport keys may rotate.
+3. **Transport verification key** proves a caller may move records for a named
+   source or read grant.
+4. **Event author** signs the exact Nostr event being transported.
+5. **Custodian** stores or relays authorized events and blobs without becoming
+   their owner or author.
+
+An `export` offer names counterparty **owner identities** permitted to answer
+the offer. `admit` and `read` grants name **transport verification keys**. A
+node that separates application ownership from transport therefore uses
+different public keys in these positions.
+
+## Why a matched pair, not a countersigned document
+
+A Nostr event carries one signature. Rather than inventing a
+countersignature envelope, each party signs its own half:
+
+- the **source** declares what it exports and to whom;
+- the **destination** declares what it admits and from whom.
+
+An agreement **exists** exactly when the two declarations match under the
+deterministic rule in *Matching*. Three properties fall out:
+
+1. **Tension stays visible.** An unmatched declaration is an observable
+   proposal or an observable drift, not a hidden config difference. When one
+   party revises its half, the match breaks until the other party re-pins —
+   the disagreement is in both journals, timestamped and signed.
+2. **Both journals hold the whole agreement.** Declarations are ordinary
+   events; they replicate over the same streams they govern. After one sync,
+   each party's journal contains both halves.
+3. **No coordination server.** Matching is a pure function over two events
+   any observer can evaluate.
+
+## Kind
+
+One provisional kind, `3070x` (**TBD**), parameterized replaceable. All
+declaration roles share it; the `d` tag disambiguates:
+
+```
+d = "<role>/<stream-id>"        role ∈ { export, admit, read, key-grant }
+```
+
+Addressable semantics give each `(party, role, stream)` cell last-write-wins
+with the NIP-01 tie-break, and the monotonic `created_at` discipline from
+NIP-AE §Writing applies. Revocation is a replacement whose body carries
+`"status": "revoked"` — history of the grant remains in the journal; only
+the head changes.
+
+## Declaration roles
+
+Bodies are JSON in `content` (plaintext — declarations govern streams, and
+their observability is the point; anything private belongs in what the
+streams carry, not in the governance). Unknown fields MUST be ignored.
+
+### `export` — source-side
+
+Declares one exported stream. The selection is part of the stream's
+identity: changing it requires a new stream ID (established invariant from
+the selective-streams work).
+
+```jsonc
+{
+  "kind": 3070x,
+  "tags": [
+    ["d", "export/rendezvous/ted-sovereign"],
+    ["p", "<destination-owner-pubkey>"]          // zero or more owners allowed to answer
+  ],
+  "content": {
+    "status": "active",
+    "selection": { "from_source": "ted-laptop/sovereign" },
+      // exactly one of: {"mirror": true} | {"filter": [ ... ]} |
+      //                 {"from_source": "<id>"}
+    "cursor_space": "cf-sqlite-v1:",             // informative
+    "artifacts": "referenced"                     // none | referenced (see below)
+  }
+}
+```
+
+### `admit` — destination-side
+
+Declares the destination-controlled binding for one stream: which transport
+principal, under which verification keys, pinned to which export.
+
+```jsonc
+{
+  "tags": [
+    ["d", "admit/rendezvous/ted-sovereign"],
+    ["p", "<transport-principal-pubkey>"],       // one or more active keys
+    ["e", "<export-declaration-event-id>"]       // the pin (see Matching)
+  ],
+  "content": {
+    "status": "active",
+    "principal": "did:buzz:node-b-puller",       // stable label; keys rotate
+    "retention": { "keep": "journal" }           // journal | effective
+  }
+}
+```
+
+### `read` — source-side reader grant
+
+Authorizes a principal to drain an exported stream (the rendezvous role).
+Same shape as `admit` seen from the other side: `d = "read/<stream-id>"`,
+`p` = reader transport verification key(s), `e` pin to the export declaration.
+
+### `key-grant` — compartment capability record
+
+Records that a compartment's read capability was conveyed to a grantee. The
+event contains **no key material** — the key moves out of band; this is the
+attributable record that it moved, and the anchor for rotation discipline.
+
+```jsonc
+{
+  "tags": [
+    ["d", "key-grant/ctx-buzz"],
+    ["p", "<grantee-pubkey>"]
+  ],
+  "content": {
+    "status": "active",
+    "compartment": "<compartment-pubkey>",       // public label, not the path
+    "granted_at": 1785090000,
+    "rotation": "on-revoke"
+      // encryption grants cannot be retracted; revocation of this
+      // declaration obligates the grantor to rotate the compartment
+      // (new derived key, new #p label) for future content
+  }
+}
+```
+
+### `steward` — operational role grant
+
+Delegates bounded *operational* attention over a node to an agent principal.
+Never configuration authority, never key custody: a steward watches and
+reports; every power beyond that requires its own future vocabulary
+revision, granted one declaration at a time as observed reporting earns it
+(the apprenticeship discipline).
+
+```jsonc
+{
+  "tags": [
+    ["d", "steward/cf-rendezvous"],
+    ["n", "cf-rendezvous"],                      // the node under stewardship
+    ["p", "<steward-agent-pubkey>"],             // NIP-OA-capable agent key
+    ["h", "<shared-context-id>"]                 // where reports land
+  ],
+  "content": {
+    "status": "active",
+    "principal": "did:buzz:steward-cf",
+    "powers": ["observe", "report"]
+      // v0 closed set. "observe": read journal, declaration heads, and
+      // derived config state. "report": publish plain events into the
+      // named shared context. A steward declaration confers NOTHING else —
+      // not admits, not grants, not deploys.
+  }
+}
+```
+
+Steward reports are ordinary kind-1 events tagged into the shared context —
+deliberately, so any upstream client renders the steward's work as channel
+conversation and the delegation history stays humanly auditable.
+
+## Compatibility invariant: degrades to plain events
+
+Every primitive in this specification is expressible as NIP-01 signed
+events and filters. Declarations are addressable events; streams are
+filters; agreements are matched event pairs; artifact manifests are `x`
+tags on events; operating configuration is the evaluation of declaration
+heads. The replication ports, rendezvous read endpoint, and artifact store
+are **optimizations, not dependencies**.
+
+Consequently: **any Buzz or Nostr relay can custody sovereign primitives
+without understanding them.** A vanilla community relay stores declarations
+as ordinary addressable events and serves them over ordinary REQ. Adapters
+that do understand the vocabulary get governance, provenance, and blob
+custody; adapters that do not still get correct storage and delivery.
+Nothing in the sovereign layer may break this property.
+
+## Shared contexts: the binding is a space
+
+A binding between two sovereigns is not a config artifact — it is a
+**shared context**: a space both parties write into, carrying the
+relationship's own record (declaration halves, session records, shared
+tooling, steward reports). The context does not describe the binding; it
+*is* the binding.
+
+The shared context ID and stream ID are separate. The `h` tag names the space a
+person opens; the stream ID names one delivery selection that may carry that
+space. Multiple streams may custody the same context under different topologies
+without changing the context's identity.
+
+Shared contexts are scoped with NIP-29 `h` tags — deliberately upstream's
+group vocabulary, so:
+
+- a **two-member shared context** is a sovereign binding;
+- a **community Buzz relay** is the N-member case of the same object, with
+  relay-equals-group-equals-boundary as its (legitimate) governance model;
+- an unmodified upstream client can open a binding as a channel — the
+  relationship is browsable with tools that know nothing of this spec.
+
+Custody of a shared context can live on either party's node or on a
+rendezvous custodian; authority stays with the members' keys (custody and
+authority separate, as everywhere else in this architecture).
+
+## Unilateral bindings (legacy counterparties)
+
+Matching (below) requires both halves — correct between vocabulary-speaking
+sovereigns, impossible when the counterparty is a legacy relay that will
+never mint declarations. A binding to such a counterparty is declared
+**unilaterally**: the sovereign side publishes its half with
+`"mode": "unilateral"` in content, documenting what it exports to and
+admits from the counterparty. The counterparty's *observed behavior* is the
+de facto other half; the unilateral declaration is the attributable record
+of intent that drift reporting (a steward duty) measures behavior against.
+A unilateral declaration governs only its author's own adapters — it
+confers nothing on the counterparty and claims nothing about consent
+(security invariant 5 is unchanged).
+
+## Matching
+
+An agreement over stream `S` between source `A` and destination `B` exists
+iff all of the following hold at the current heads:
+
+1. Source owner `A` has an active `export/S` declaration whose `p` tags include
+   destination owner `B`.
+2. Destination owner `B` has an active `admit/S` declaration whose `p` tags name the transport
+   principal actually presenting evidence, and whose `e` tag equals the
+   event ID of `A`'s current `export/S` head.
+3. The declarations agree on the stream ID byte-for-byte.
+
+This match expresses mutual owner intent only. Pull or rendezvous-mediated
+delivery additionally requires an active `read/S` grant naming the presenting
+transport key. Destination ingest additionally evaluates the `admit/S`
+transport keys. Agreement state and transport readiness MUST be reported
+separately: neither implies the other.
+
+Rule (2)'s pin is the drift detector: if `A` replaces its export declaration
+(new selection ⇒ new stream ID; new readers or metadata ⇒ same `d`, new
+event ID), `B`'s pin goes stale and the match breaks **visibly** until `B`
+re-pins. Tooling SHOULD surface unmatched-declaration state; runtimes MAY
+refuse to serve or ingest unmatched streams (strictness is adapter policy in
+v0.1, normative in a later revision once operational experience accumulates).
+
+## Artifacts
+
+`"artifacts": "referenced"` in an export declares that events on the stream
+may reference content-addressed blobs (`x` tags, pack digests) and that the
+source (or the rendezvous custodian) serves them from its artifact store to
+the same principals authorized for the stream. The event stream is the
+manifest: a destination discovers missing blobs by walking references in
+records it has already verified, fetching by hash, and verifying content —
+possession is idempotent, so blob sync inherits the stream's
+interruption-safety without its own cursor.
+
+Git repositories are the special case that needs no special case: packs and
+manifests are artifacts; ref state is NIP-34 `kind:30618`; the agreement
+governs the stream those events travel on.
+
+## Mapping from current operator configuration
+
+| Today's config | Becomes |
+| --- | --- |
+| `streams.json` entry (laptop) / `BUZZ_REPLICATION_STREAMS` (Cloudflare) | `export/<stream>` declaration |
+| `peer-trust.json` entry / `BUZZ_REPLICATION_PEERS` | `admit/<stream>` declaration |
+| `BUZZ_REPLICATION_READERS` entry | `read/<stream>` declaration |
+| hand-delivered compartment key | `key-grant/<label>` declaration |
+
+Migration is mechanical: derive the declaration from the config entry, sign,
+publish, and (optionally) regenerate config *from* the declaration heads —
+at which point the journals are the source of truth and the files are a
+cache. The four-places-edited-by-hand drift observed in practice is the
+problem this ordering removes.
+
+## Runtime evaluation (v0.1 adapter policy)
+
+Adapters derive operating configuration from declaration heads at defined
+evaluation points — the laptop adapter at process start, the Cloudflare
+adapter at each replication request. Three rules:
+
+1. **Owner anchor, node scope.** Only declaration heads authored by the
+   node's owner pubkey AND carrying an `n` tag equal to the node's own label
+   govern that node's configuration. Both anchors are bootstrap data (laptop
+   `--owner`/`--node-label`, Cloudflare `BUZZ_OWNER_PUBKEY`/`BUZZ_NODE_LABEL`);
+   they are identity, not policy, and stable across deploys. The `n` tag is
+   what keeps a replicated journal safe to evaluate everywhere: one owner's
+   declarations for different nodes coexist in every copy of the journal,
+   and each node evaluates only its own. A head without an `n` tag governs
+   no node's configuration (it can still be a relationship half). Foreign
+   declarations remain relationship halves — they confer nothing without a
+   matching owner half (invariant 5).
+2. **Per-domain precedence, wholesale.** The domains are `admit/*` (sink
+   peer trust), `export/*` (stream exports), and `read/*` (reader grants),
+   each scoped to this node's label. If the journal holds *any* owner-signed
+   head in a domain for this node — whatever its status — the journal
+   governs that domain entirely and file/env config
+   for the domain is ignored; only `status: "active"` heads confer trust.
+   File/env is consulted solely when the journal holds no head in the
+   domain (bootstrap). Revocation is therefore irreversible by fallback: a
+   domain whose every head is revoked is an empty domain, not a reversion
+   to files.
+3. **Fail closed.** No owner anchor means no journal-derived configuration.
+   No heads and no bootstrap config means empty trust.
+4. **Artifact access follows reference.** A custodian serves a
+   content-addressed blob only to (a) the owner, or (b) a principal holding
+   an active `read` grant on a stream whose journal events reference the
+   blob (`x` tag). Uploads are accepted only from the owner or admitted
+   replication peers. An unreferenced blob is invisible to everyone but the
+   owner. Events are the manifest; the reference closure extends per-stream
+   visibility to blob custody with no separate artifact ACL.
+
+## Security invariants
+
+1. Declarations are intent, not credentials. Transport evidence and
+   destination verification are unchanged and remain mandatory.
+2. A `key-grant` event never contains key material, path names, or slugs —
+   only the compartment's public label and the grantee.
+3. Revoking `admit` or `read` takes effect at the next evaluation; revoking
+   `key-grant` obligates compartment rotation (confidentiality of already-
+   conveyed content is not retroactively recoverable, and the spec does not
+   pretend otherwise).
+4. Matching is evaluated over declaration *heads*; superseded declarations
+   remain in both journals as history.
+5. A declaration naming a counterparty confers nothing on that counterparty
+   without the counterparty's own matching half.
+
+## Explicitly outside v0.1
+
+- Kind number assignment (upstream registry decision; 30700 provisional).
+- Relay-side enforcement of matching (adapter policy for now).
+- Steward powers beyond `observe`/`report` (each future power is its own
+  vocabulary revision, granted per-act as reporting earns it).
+- Multi-party (>2) agreements and delegation chains (shared contexts hold
+  N members, but agreement matching stays pairwise).
+- Negotiation protocol (offers are just unmatched declarations).
+- Retention auditing and proof-of-custody.
+- NIP-77-style set reconciliation (orthogonal efficiency upgrade).
+
+## Traceability
+
+- Telos: [`../TELOS.md`](../TELOS.md)
+- Parent boundary:
+  [`portable-relay-boundary.md`](portable-relay-boundary.md)
+- Replication semantics: the replication profile and
+  [selective streams](portable-relay-boundary.md) invariants
+  (predicate-is-identity, source-owned cursors, checkpoint-safe receipts)
+- Identity semantics:
+  [`portable-relay-identity-v0.1.md`](portable-relay-identity-v0.1.md)
+- Prior art: NIP-AE (addressable heads, monotonic writes), NIP-OA
+  (capability tags), NIP-34 (`kind:30618` ref state), Blossom
+  (content-addressed blobs), upstream git CAS
+  (`crates/buzz-relay/src/api/git/`)
