@@ -69,14 +69,14 @@ number driven toward a target. **Drill failure includes the gap growing
 unexpectedly** — a context that silently stopped exporting is exactly
 what the drill exists to catch.
 
-## The identity decision (owner's call, shape recommended)
+## The identity rule (decided by the owner, 2026-07-31)
 
 Rented metal raises the question the identity roles were built for:
-*which keys may touch the droplet?* Recommended shape, pending the
-owner's decision:
+*which keys may touch the droplet?* The rule:
 
 - The **owner root key never touches rented metal.** It stays on
-  hardware at Nest.
+  hardware at Nest. This is a rule, not a recommendation: a drill run
+  that places root material on the droplet is an automatic failure.
 - Each drill mints a **scoped drill identity**; a declaration grants it
   read on the exported streams for the drill window. This exercises the
   kind-30700 vocabulary exactly as proposed upstream: trust as signed,
