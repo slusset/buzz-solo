@@ -1,32 +1,32 @@
-id: host-capability-manifest
+id: host-capability-claim
 type: model
-entity: HostCapabilityManifest
-aggregate: HostCapabilityManifest
+entity: HostCapabilityClaim
+aggregate: HostCapabilityClaim
 description: |
-  A signed host-local declaration of mechanical capabilities available to one
-  node runtime. It describes what an adapter can do without becoming node
-  identity, policy authority, event author, or journal history.
+  A signed host-local claim about mechanical capabilities available to a
+  NodeRuntimeInstance. The claim is evidence only until an authorized
+  PrincipalNode binds it. Neither claim nor binding grants domain authority.
 
 sources:
   stories:
-    - specs/stories/node-runtime/declare-host-capabilities-without-domain-authority.md
-    - specs/stories/node-runtime/promote-compatible-node-runtime.md
+    - specs/stories/principal-node/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/principal-node/promote-compatible-node-runtime.md
   journeys:
-    - specs/journeys/evolve-a-sovereign-node-runtime.md
+    - specs/journeys/evolve-a-principal-node.md
   architecture:
     - specs/architecture/node-host-boundary-v0.1.md
-    - specs/architecture/node-runtime-boundary-v0.1.md
+    - specs/architecture/principal-node-boundary-v0.1.md
 
 identity:
-  fields: [manifest_digest]
+  fields: [claim_digest]
   description: The content digest identifies one immutable signed revision; host_label is presentation only.
 
 attributes:
-  manifest_digest:
+  claim_digest:
     type: ContentDigest
     required: true
     immutable: true
-  manifest_revision:
+  claim_revision:
     type: string
     required: true
     immutable: true
@@ -58,7 +58,7 @@ attributes:
     type: list<AttestationCapability>
     required: true
   signer:
-    type: HostManifestSigner
+    type: HostClaimSigner
     required: true
   signature:
     type: Signature
@@ -79,32 +79,32 @@ value_objects:
     representation: [os_signals, harness_adapters, process_abandonment_evidence]
   - name: AttestationCapability
     representation: [kind, verification_properties]
-  - name: HostManifestSigner
+  - name: HostClaimSigner
     representation: host_attestation_principal
   - name: Signature
-    representation: detached_signature_over_canonical_manifest
+    representation: detached_signature_over_canonical_claim
 
 commands:
   - name: DeclareCapabilities
     actor: host_adapter
     input: [adapter_revision, capability_references, capability_properties]
-    output: unsigned_canonical_manifest
-  - name: SignManifest
-    actor: host_manifest_signer
-    input: [canonical_manifest]
-    output: signed_host_capability_manifest
-  - name: VerifyManifest
-    actor: node_runtime
-    input: [signed_manifest, trusted_host_attestation_policy]
-    output: verified_manifest_or_refusal
+    output: unsigned_canonical_claim
+  - name: SignClaim
+    actor: host_claim_signer
+    input: [canonical_claim]
+    output: signed_host_capability_claim
+  - name: VerifyClaim
+    actor: principal_node
+    input: [signed_claim, trusted_host_attestation_policy]
+    output: verified_claim_or_refusal
   - name: MatchCapabilityProfile
-    actor: node_runtime
-    input: [verified_manifest, required_capability_profile]
+    actor: principal_node
+    input: [verified_claim, required_capability_profile]
     output: [satisfied, degraded, blocked]
 
 rules:
-  - id: manifest-declares-ability-not-authority
-    description: A declared host capability permits a mechanical call only after node-runtime policy chooses it.
+  - id: claim-declares-ability-not-authority
+    description: A claimed host capability permits a mechanical call only after an authorized PrincipalNode binds and chooses it.
     enforced: authorization
   - id: references-not-secrets
     description: Custody and placement fields contain opaque references and properties, never private key bytes or reusable credentials.
@@ -118,23 +118,23 @@ rules:
 
 invariants:
   - id: host-label-is-presentation-only
-    description: Changing host_label does not change manifest signer, node principal, owner, or authority.
+    description: Changing host_label does not change claim signer, PrincipalNode, PrincipalDomain, owner, or authority.
   - id: host-cannot-author-domain-decisions
     description: The adapter cannot choose streams, interpret cursors, broaden grants, reconcile findings, or append domain events on its own authority.
   - id: host-mechanisms-remain-external
     description: Paths, service names, timer mechanisms, and credential identifiers remain outside journal events.
   - id: equivalent-capabilities-are-observationally-consistent
-    description: Conforming adapters produce the same node-visible outcomes for capabilities they both declare.
+    description: Conforming adapters produce the same PrincipalNode-visible outcomes for capabilities they both declare.
 
 boundaries:
   inside:
     - host capability vocabulary
-    - canonical signed declaration
+    - canonical signed host claim
     - host-local references and capability properties
     - conformance profile matching
   outside:
-    - node synchronization and retry policy
+    - PrincipalNode authorization, synchronization, and retry policy
     - event and declaration authorship
     - cursor interpretation and commitment policy
-    - node identity and journal state
+    - PrincipalDomain and PrincipalNode identity or journal state
     - OS-specific implementation details behind each capability

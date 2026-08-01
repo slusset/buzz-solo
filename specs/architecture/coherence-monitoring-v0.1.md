@@ -8,14 +8,16 @@ Date: 2026-07-31
 Testing in Buzz Solo is **coherence observation at three time scales**:
 merge-time (the five CI lanes), runtime (this spec), and resurrection-time
 ([the resurrection drill](resurrection-drill-v0.1.md)). Coherence monitoring
-is the runtime scale: the node continuously observes whether its
+is the runtime scale: each PrincipalNode continuously observes whether its
 architectural evidence still agrees —
 
 - **intent** — TELOS and the spec chain;
 - **model and code** — stories, domain models, behavior contracts, and the
   repository at the running node's version;
-- **release and host binding** — verified runtime bytes, compatibility claims,
-  and declared host capabilities;
+- **principal authority** — stable PrincipalDomain identity, current root
+  authority, PrincipalNode authorization, and revocation state;
+- **release and host binding** — selected verified runtime bytes,
+  compatibility claims, host capability claim, and PrincipalNode binding;
 - **runtime** — the living state: journal, projections, declarations,
   replicas, sessions.
 
@@ -26,7 +28,7 @@ Two rules are absolute:
    read-only posture as the context explorer and the same fail-closed
    philosophy as everything else.
 2. **Observation and recording are separate.** Evaluation is read-only.
-   After it completes, an authorized node identity may record the finding as
+   After it completes, an authorized PrincipalNode identity may record the finding as
    metadata-only witness residue through the normal append path. Recording is
    never implicit and cannot change the subject that was observed.
 
@@ -69,20 +71,38 @@ lag window; drain-leg cursor health (advancing, resumable); beacon
 pulses observed from both nodes (`buzz context pulse` is the existing
 heartbeat — its absence is itself a finding).
 
-### runtime-boundary-coherence
+### domain-node-coherence
 
-The live component graph agrees with the
-[node-runtime boundary](node-runtime-boundary-v0.1.md): one selected runtime
-owns synchronization and cursor decisions. Independently supervised pull,
-push, cursor, or coherence jobs are violations when they interpret domain
-state rather than act as adapters through node-runtime ports.
+The PrincipalDomain ID remains stable across root-key rotation; the current
+root-authority chain is valid; the PrincipalNode authorization names exactly
+one PrincipalDomain and is active for the operation being observed. A
+RuntimeInstance, release, host claim, or raw key appearing as the durable
+domain or node identity is a violation.
+
+### principal-node-coherence
+
+The live component graph agrees with the [Principal Domain and Principal Node
+boundary](principal-node-boundary-v0.1.md): one PrincipalNode owns
+synchronization, cursor, checkpoint, release-selection, and coherence
+decisions. Independently supervised pull, push, cursor, or coherence jobs are
+violations when they interpret domain state rather than act through
+PrincipalNode ports.
+
+### runtime-instance-coherence
+
+At most one RuntimeInstance is selected as active for a PrincipalNode at a
+semantic instant. Its executable digest, release manifest, host binding, and
+composition root agree with the PrincipalNode checkpoint. A stale process may
+exist physically during replacement but cannot remain selected or gain
+independent authority.
 
 ### host-capability-coherence
 
-The active verified host capability manifest satisfies the runtime's required
-profile. Placement, custody, supervision, clock/wake, session, and attestation
-claims resolve to bounded evidence. Missing evidence is `unknown`, never an
-inferred success; optional loss is explicit degradation.
+The active verified host capability claim and PrincipalNode-signed binding
+satisfy the selected RuntimeInstance's required profile. Placement, custody,
+supervision, clock/wake, session, and attestation claims resolve to bounded
+evidence. Missing evidence is `unknown`, never an inferred success; optional
+loss is explicit degradation.
 
 ### release-coherence
 
@@ -113,10 +133,10 @@ merge-time CI cannot.
   `buzz context doctor` remains the operator-facing summary and gains a
   coherence section. (Namespace per the tooling spec: node-level
   commands never take a root.)
-- Scheduled runs enter the node runtime through its clock/wake port. The node
-  owns cadence and the invariant procedure; launchd, systemd, a foreground
-  loop, or another host mechanism only delivers “evaluate now” with declared
-  timing properties.
+- Scheduled runs enter the PrincipalNode through the active RuntimeInstance's
+  clock/wake port. The PrincipalNode owns cadence and the invariant procedure;
+  launchd, systemd, a foreground loop, or another host mechanism only delivers
+  “evaluate now” with declared timing properties.
 - Observations carry invariant id, subject, status (`ok | drift | violation |
   unknown`), criticality, observer revision, and observed/expected references
   (event IDs, head addresses, cursor positions, release digests — never payload
@@ -157,7 +177,8 @@ silently changing policy.
 - a seeded incoherence of each class (a tampered projection file, a
   stale replica grant, an orphaned active session, an unspecced kind, an
   independently supervised sync job, a missing host capability, or release
-  byte skew) is detected by the corresponding invariant within its tier's
+byte skew, invalid node authorization, or stale RuntimeInstance selection) is
+detected by the corresponding invariant within its tier's
   cadence;
 - monitoring runs produce no publication or replication side effects.
 
@@ -182,7 +203,7 @@ silently changing policy.
   [`../contracts/agent-harness/durable-context-hooks.yaml`](../contracts/agent-harness/durable-context-hooks.yaml)
 - Scheduling: [`node-host-boundary-v0.1.md`](node-host-boundary-v0.1.md)
   (clock/wake and supervision ports)
-- Runtime ownership:
-  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- PrincipalDomain, PrincipalNode, and RuntimeInstance ownership:
+  [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)
 - Observation model:
-  [`../models/node-runtime/coherence-observation.model.yaml`](../models/node-runtime/coherence-observation.model.yaml)
+  [`../models/principal-node/coherence-observation.model.yaml`](../models/principal-node/coherence-observation.model.yaml)

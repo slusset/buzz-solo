@@ -5,18 +5,19 @@ Date: 2026-07-31
 
 ## Decision
 
-The sovereign node binds to its host machine through declared **host
-capability ports**, the same way the portable relay core binds to runtimes
-through relay ports. A host adapter declares what its host can do —
+Each Principal Node binds a RuntimeInstance to a host machine through declared
+**host capability ports**, the same way the portable relay core binds to
+runtimes through relay ports. A host adapter declares what its host can do —
 supervision, placement, secret custody, clock/wake delivery, session signals,
-and attestation — and the node consumes those capabilities without ever
-touching OS APIs directly.
+and attestation — and the RuntimeInstance consumes those capabilities without
+letting PrincipalNode application policy touch OS APIs directly.
 
-The consumer of these ports is the portable
-[sovereign node runtime](node-runtime-boundary-v0.1.md). The host never runs a
-parallel domain workflow: it may start, stop, and wake the node runtime, but it
-does not own synchronization, cursor advancement, retry semantics, agreement
-evaluation, or coherence policy.
+The consumer of these ports is a
+[NodeRuntimeInstance](principal-node-boundary-v0.1.md) executing for one
+authorized PrincipalNode. The host never runs a parallel domain workflow: it
+may start, stop, and wake a RuntimeInstance, but it does not own PrincipalNode
+authorization, synchronization, cursor advancement, retry semantics,
+agreement evaluation, checkpointing, or coherence policy.
 
 Two things become first-class that are conventions today:
 
@@ -25,11 +26,12 @@ Two things become first-class that are conventions today:
    [durable-context-hooks](../contracts/agent-harness/durable-context-hooks.yaml)
    contract stays the authoritative agent-session surface; the host adapter
    is its carrier.
-2. **The node's bounded context has an artifact form.** A signed,
-   content-addressed **node context manifest** names everything a host must
-   hydrate — journal head, profile, custody requirements, context heads —
-   making host migration and disaster recovery defined operations instead
-   of folklore.
+2. **Principal continuity has an artifact form.** A signed,
+   content-addressed **principal context artifact** combines PrincipalDomain
+   reconstruction evidence with a PrincipalNode checkpoint: authorization,
+   journal and cursor heads, selected release, profile digest, host binding,
+   custody requirements, and context heads. Host migration and disaster
+   recovery become defined operations instead of folklore.
 
 A **passkey profile** names WebAuthn/FIDO2 user verification as the
 mechanism that seals key material and gates capability minting.
@@ -58,57 +60,63 @@ without a capability boundary it does not travel:
 ## Layered bounded contexts
 
 The question "what is the bounded context around the portable local relay"
-resolves into three nested contexts and one application boundary:
+resolves into a stable domain, an authorized node, and an ephemeral execution
+inside the host context:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │ HOST CONTEXT — machine, OS session, authenticators,        │
 │ harnesses. Reached only through host capability ports.     │
 │  ┌───────────────────────────────────────────────────────┐ │
-│  │ NODE RUNTIME — portable application boundary:         │ │
-│  │ lifecycle, sync, cursors, coherence, compatibility.   │ │
+│  │ NODE RUNTIME INSTANCE — verified release + adapters   │ │
 │  │  ┌──────────────────────┐ ┌─────────────────────────┐ │ │
-│  │  │ NODE CONTEXT         │ │ PORTABLE RELAY CORE     │ │ │
-│  │  │ identity-bound state │ │ events, filters,        │ │ │
-│  │  │ journal + cursors    │ │ decisions               │ │ │
-│  │  └──────────────────────┘ └─────────────────────────┘ │ │
+│  │  │ PRINCIPAL NODE       │ │ PORTABLE RELAY CORE     │ │ │
+│  │  │ sync, cursors,       │ │ events, filters,        │ │ │
+│  │  │ checkpoints          │ │ decisions               │ │ │
+│  │  └──────────┬───────────┘ └─────────────────────────┘ │ │
+│  │             │ authorized by                          │ │
+│  │  ┌──────────▼───────────────────────────────────────┐ │ │
+│  │  │ PRINCIPAL DOMAIN — root context + journal       │ │ │
+│  │  └──────────────────────────────────────────────────┘ │ │
 │  └───────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────┘
 ```
 
 - The **relay core** is already bounded by
   [portable-relay-boundary](portable-relay-boundary.md).
-- The **node runtime** is bounded by
-  [node-runtime-boundary](node-runtime-boundary-v0.1.md). It is the
-  application that operates the node context and consumes host ports; it is
-  not another durable identity.
+- The **PrincipalDomain**, **PrincipalNode**, and **NodeRuntimeInstance** are
+  bounded by [principal-node-boundary](principal-node-boundary-v0.1.md). The
+  RuntimeInstance composes the application and consumes host ports; it is not
+  another durable identity.
 - The **attention contexts** inside the node are already bounded by the
   [bounded-attention-context model](../models/sticky-attention/bounded-attention-context.model.yaml):
   membership is the `h` tag, briefs are deterministic projections, and
   their filesystem artifacts are already content-addressed through the
   checkpoint manifest. Nothing here changes that.
-- The **node context** is the new named aggregate: everything that must
-  exist on a host for the owner's node to be *this* node and not a fresh
-  one. This spec bounds it against the host.
+- The **principal context artifact** is portable evidence, not a new aggregate.
+  It carries what a host needs to reconstruct the PrincipalDomain and one
+  authorized PrincipalNode without treating paths, processes, or keys as
+  their stable identities.
 
 Facts inside the host context (which launchd label, which keychain item,
 which credential ID, which timer implementation) never appear in journal
-events. Facts inside the node context never depend on a particular host's
-representation.
+events. Facts inside PrincipalDomain and PrincipalNode never depend on a
+particular host's representation.
 
 ## Host capability ports
 
 ### Supervision
 
-Ensure the composed node runtime runs, restarts after crash and boot, and
-reports process health. Adapters: launchd agent, systemd user unit, foreground
-process, container, Durable Object alarm. Minimum conformance: manual
-foreground invocation.
+Ensure the selected NodeRuntimeInstance runs, restarts after crash and boot,
+and reports process health. Adapters: launchd agent, systemd user unit,
+foreground process, container, Durable Object alarm. Minimum conformance:
+manual foreground invocation.
 
-Supervision treats the node runtime as the unit of lifecycle. Independently
-supervised pull, push, cursor, or coherence jobs are transitional compatibility
-topology and fail the target runtime-boundary coherence invariant if they make
-domain decisions outside the node runtime.
+Supervision treats a RuntimeInstance as the process lifecycle unit while the
+PrincipalNode remains the semantic lifecycle owner. Independently supervised
+pull, push, cursor, or coherence jobs are transitional compatibility topology
+and fail the target principal-boundary coherence invariant if they make domain
+decisions outside the PrincipalNode.
 
 ### Placement
 
@@ -117,8 +125,8 @@ runtime releases, and content-addressed artifacts live. The current macOS
 adapter uses the XDG-shaped layout under `~/.config`, `~/.local/share`,
 `~/.local/state`, and `~/.local/lib`; another host may represent the same
 roles differently. Placement is queried, never assumed — no other component
-may hardcode a path. Placement also reports durability facts the manifest
-needs (filesystem identity, last-verified replay).
+may hardcode a path. Placement also reports durability facts the principal
+context artifact needs (filesystem identity, last-verified replay).
 
 ### Secret custody
 
@@ -153,11 +161,11 @@ delivery. The host chooses how a wake is delivered — launchd timer, systemd
 timer, foreground loop, process callback, or platform alarm — and declares
 its resolution and persistence properties.
 
-The node runtime owns cadence, debounce, retry classification, and what work a
+The PrincipalNode owns cadence, debounce, retry classification, and what work a
 wake causes. A wake means only “evaluate now.” It carries no trusted stream,
 cursor, grant, peer policy, or reconciliation decision. A missed wake is
-handled by the node runtime's recovery policy, not by a second host-owned sync
-procedure.
+handled by PrincipalNode recovery policy through the current RuntimeInstance,
+not by a second host-owned sync procedure.
 
 ### Session signals
 
@@ -197,9 +205,10 @@ claims if any. Consumed when minting capabilities (a capability may record
 the verification level that authorized it) and when hydrating a node onto
 a new host (the arrival is witnessed, not assumed).
 
-## Capability manifest
+## Host capability claim and PrincipalNode binding
 
-A host adapter declares, in one signed document per host:
+A host attestation identity signs one immutable capability claim per host
+revision:
 
 ```text
 {
@@ -213,12 +222,14 @@ A host adapter declares, in one signed document per host:
 }
 ```
 
-Conformance is judged per declared capability — a host that declares no
+Conformance is judged per claimed capability — a host that declares no
 authenticator is conformant with core; it simply cannot claim the passkey
 profile. This is how "different hosts have different capabilities" stays a
-feature instead of an error: the node consults the manifest and degrades
-explicitly (e.g. refuses to place `passkey-sealed` material on a host
-without an authenticator) rather than discovering gaps at ceremony time.
+feature instead of an error: the PrincipalNode verifies the claim, signs a
+bounded host binding, and degrades explicitly (e.g. refuses to place
+`passkey-sealed` material on a host without an authenticator) rather than
+discovering gaps at ceremony time. A host claim alone is never usable
+PrincipalNode or PrincipalDomain authority.
 
 ## Passkey profile (`node-host-passkey-v0.1`)
 
@@ -249,7 +260,7 @@ with a uniform ceremony. The profile:
    allowed to be the *only* custody of any key. Losing an authenticator
    must cost a recovery ceremony, never the engram history.
 
-## The node context artifact
+## The principal context artifact
 
 **Is the bounded context in artifact form? Yes — in three layers, two of
 which already exist:**
@@ -259,16 +270,24 @@ which already exist:**
    (`ArtifactManifestHead`).
 2. **The journal** — already portable by construction: an NDJSON file of
    signed events is its own archive.
-3. **The node context manifest** — new, and the piece that makes the node
-   itself portable. A signed, content-addressed document naming:
+3. **The principal context artifact** — new, and the piece that makes domain
+   and node continuity portable. It contains a PrincipalNode checkpoint and
+   enough PrincipalDomain evidence for journal reconstruction:
 
 ```text
 {
-  owner_pubkey,
-  runtime:        node/vX.Y.Z signed tag reference,
+  principal_domain_id,
+  domain_root_authority_ref,
+  principal_node_id,
+  principal_node_authorization_ref,
+  checkpoint_signer_ref,
+  runtime:        node/vX.Y.Z signed tag reference + RuntimeInstance id,
   journal_head:   { last_event_id, event_count, content_hash },
   profile_hash:   hash of the profile document (references only —
-                  key material never enters the manifest),
+                  key material never enters the artifact),
+  host_claim_hash,
+  host_binding_hash,
+  cursor_heads:   [ (source_stream_id, opaque_cursor_digest) ],
   custody_needs:  custody class + verification level per identity role,
   context_heads:  [ (h, head event ids) ]   # pointers into the journal,
   artifact_manifest_heads: [ ... ],         # pointers, not payloads
@@ -277,27 +296,33 @@ which already exist:**
 }
 ```
 
-The manifest is **inventory and integrity, never authority**. The journal
-remains the sole source of truth; a manifest that disagrees with journal
-replay fails hydration closed.
+The artifact is **inventory and integrity, never self-authorizing**. Domain
+authority comes from the domain-root chain; node authority comes from the
+current PrincipalNode authorization; host use comes from claim plus binding.
+The journal remains the source of durable domain history, and disagreement
+with journal replay fails hydration closed.
 
-**Hydration** (new host): fetch runtime by signed tag → place journal and
-profile per the placement port → verify replay against `journal_head` →
+**Hydration** (new host): verify domain and node authorization → fetch runtime
+by signed tag → place journal and profile per the placement port → verify
+replay against `journal_head` and cursor heads →
 provision custody (unwrap the envelope via recovery or passkey ceremony;
 re-provision and re-attest `hardware` classes, which never travel) →
-register supervision → append a witnessed `node-hydrated` record.
+verify the host claim → sign the PrincipalNode host binding → create a new
+RuntimeInstance → register supervision → append a witnessed `node-hydrated`
+record.
 **Dehydration** is the inverse and may ride the existing artifact custody
 legs for transport. Host migration and disaster recovery become the same
 operation with different moods.
 
-Bounded attention contexts are *not* re-serialized by the manifest — they
-are h-scoped event sets inside the journal, and the manifest only points
-at their heads. One journal, many contexts, one manifest per node.
+Bounded attention contexts are *not* re-serialized by the artifact — they
+are h-scoped event sets inside the journal, and the artifact only points
+at their heads. One logical journal, many contexts, one current checkpoint per
+PrincipalNode.
 
 ## Conformance sketch
 
 - `node-host-core-v0.1` — placement + `file` custody + manual
-  supervision + foreground clock/wake + manifest dehydrate/hydrate round trip
+  supervision + foreground clock/wake + principal-context dehydrate/hydrate round trip
   on one host. (The current laptop setup, named.)
 - `node-host-session-v0.1` — OS session seal/unseal policy honored;
   agent-session hooks carried per the durable-context-hooks contract with
@@ -313,7 +338,8 @@ at their heads. One journal, many contexts, one manifest per node.
 ## Non-goals
 
 - No change to relay protocol semantics or the portable relay boundary.
-- No host ownership of synchronization, cursor, retry, or coherence semantics.
+- No host or RuntimeInstance ownership of PrincipalNode authorization,
+  synchronization, cursor, retry, checkpoint, or coherence semantics.
 - No multi-owner or shared-host semantics.
 - No biometric identity claims — a ceremony proves *an enrolled
   authenticator verified its user*, nothing more.
@@ -330,7 +356,7 @@ at their heads. One journal, many contexts, one manifest per node.
   *release policy*).
 - Whether ceremony witness records belong in the default `h` boundary or
   a dedicated node-operations context.
-- Whether the capability manifest itself should live in the journal as a
+- Whether the host capability claim itself should live in the journal as a
   replaceable event (host facts in events contradicts the layering rule
   above — leaning no: it stays a host-local signed file, referenced by
   hash from hydration records).
@@ -339,10 +365,10 @@ at their heads. One journal, many contexts, one manifest per node.
 
 - Telos: [`../TELOS.md`](../TELOS.md)
 - Relay boundary: [`portable-relay-boundary.md`](portable-relay-boundary.md)
-- Node runtime boundary:
-  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
-- Host capability model:
-  [`../models/node-host/host-capability-manifest.model.yaml`](../models/node-host/host-capability-manifest.model.yaml)
+- Principal Domain and Principal Node boundary:
+  [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)
+- Host capability claim model:
+  [`../models/node-host/host-capability-claim.model.yaml`](../models/node-host/host-capability-claim.model.yaml)
 - Identity profile: [`portable-relay-identity-v0.1.md`](portable-relay-identity-v0.1.md)
 - Agent-session surface:
   [`../contracts/agent-harness/durable-context-hooks.yaml`](../contracts/agent-harness/durable-context-hooks.yaml)

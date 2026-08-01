@@ -16,24 +16,24 @@ the existing scheduled recovery — never a correctness dependency.
 
 ## Design
 
-Three triggers, one procedure inside the
-[sovereign node runtime](node-runtime-boundary-v0.1.md):
+Three triggers, one procedure owned by the
+[PrincipalNode](principal-node-boundary-v0.1.md):
 
 1. **Commit-triggered push.** A durable local journal commit enqueues an
    immediate, debounced synchronization request using the same declared
-   source, stream filters, and node-owned source-bound cursor as recovery.
+   source, stream filters, and PrincipalNode-owned source-bound cursor as recovery.
    The debounce window coalesces bursts; every request enters the same
    `SyncSession` lifecycle.
 
 2. **Pulse-triggered pull (peer wake).** When the rendezvous journal head
    advances, it wakes authenticated peer sessions over their existing
    standing sockets — the same sessions the pulse layer already witnesses
-   under `coherence.sessions`. A woken peer asks its node runtime to evaluate
-   the same drain procedure as recovery. This extends the transition-driven
+   under `coherence.sessions`. A woken peer asks its PrincipalNode, through the
+   active RuntimeInstance, to evaluate the same drain procedure as recovery. This extends the transition-driven
    drain precedent (`a36cb7b79`) from beacon transitions to head-advance wake.
 
-3. **Recovery tick as backstop.** The node runtime owns the recovery cadence
-   and requests wakes through the host clock/wake capability. A launchd timer,
+3. **Recovery tick as backstop.** The PrincipalNode owns the recovery cadence
+   and requests wakes through its RuntimeInstance's host clock/wake capability. A launchd timer,
    systemd timer, foreground loop, or platform alarm may deliver the tick, but
    none owns a second synchronization procedure. A lost wake degrades to
    recovery-tick latency, never to data loss.
@@ -47,7 +47,7 @@ Three triggers, one procedure inside the
 - **One code path.** Realtime and recovery replication are the same
   procedure with different triggers. There is no separate fast path to
   drift from the recovery path.
-- **Cursor integrity.** All triggers share the node-owned, source-bound cursor
+- **Cursor integrity.** All triggers share the PrincipalNode-owned, source-bound cursor
   and stream selection. No trigger may fall back to a default cursor or an
   unselected stream set — the `context sync` cursor/selection
   passthrough defect reported in `6e0f4231…` is a hard precondition for
@@ -78,10 +78,10 @@ Three triggers, one procedure inside the
 
 ## Traceability
 
-- Runtime owner: [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- PrincipalNode owner: [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)
 - Sync session model:
-  [`../models/node-runtime/sync-session.model.yaml`](../models/node-runtime/sync-session.model.yaml)
+  [`../models/principal-node/sync-session.model.yaml`](../models/principal-node/sync-session.model.yaml)
 - Sync lifecycle:
-  [`../models/node-runtime/sync-session.lifecycle.yaml`](../models/node-runtime/sync-session.lifecycle.yaml)
+  [`../models/principal-node/sync-session.lifecycle.yaml`](../models/principal-node/sync-session.lifecycle.yaml)
 - Host clock/wake capability:
   [`node-host-boundary-v0.1.md`](node-host-boundary-v0.1.md)

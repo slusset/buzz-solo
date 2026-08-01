@@ -9,14 +9,17 @@ type: persona
 
 The person accountable for keeping Buzz's intent, domain language, runtime
 boundaries, and operational evidence coherent as the system evolves. The
-domain architect works across the portable relay, sovereign node runtime,
-host adapters, release process, and interfaces without allowing any one
-implementation detail to become accidental authority.
+domain architect works across the Principal Domain, its authorized Principal
+Nodes, ephemeral runtime instances, the portable relay, host adapters, release
+process, and interfaces without allowing any implementation detail to become
+accidental authority.
 
 ## Goals
 
 - Assign each state transition and operational responsibility to one explicit
   bounded context.
+- Preserve the distinction between durable domain identity, an authorized
+  operational node, and the process currently executing it.
 - Keep domain policy inside the node while allowing hosts and transports to
   vary through declared capabilities.
 - Express architecture choices as models, invariants, ports, and observable
@@ -32,6 +35,8 @@ implementation detail to become accidental authority.
 
 - Shell scripts and service managers quietly accumulate domain workflow.
 - A working process topology is mistaken for a coherent architecture.
+- A process, host label, or verification key is mistaken for the durable
+  Principal Node or Principal Domain it represents.
 - Host paths, credentials, scheduling, and protocol decisions become entangled
   until migration is the first time the boundaries are tested.
 - Crate and module boundaries do not always reveal which layer owns a rule.

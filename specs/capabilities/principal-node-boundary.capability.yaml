@@ -1,0 +1,35 @@
+capability:
+  id: principal-node-boundary
+  type: capability
+  status: proposed
+  description: |
+    Preserve one Principal Domain across explicitly authorized Principal Nodes
+    and ephemeral Runtime Instances. Keep synchronization and coherence
+    semantics inside each Principal Node while host adapters provide declared
+    mechanical capabilities and signed releases provide verifiable evidence.
+  scope:
+    personas:
+      - ../personas/domain-architect.md
+    journeys:
+      - ../journeys/evolve-a-principal-node.md
+    stories:
+      - ../stories/principal-node/authorize-principal-node.md
+      - ../stories/principal-node/place-synchronization-inside-principal-node.md
+      - ../stories/principal-node/declare-host-capabilities-without-domain-authority.md
+      - ../stories/principal-node/observe-principal-boundary-coherence.md
+      - ../stories/principal-node/promote-compatible-node-runtime.md
+    architecture:
+      - ../architecture/principal-node-boundary-v0.1.md
+      - ../architecture/node-host-boundary-v0.1.md
+      - ../architecture/coherence-monitoring-v0.1.md
+    models:
+      - ../models/principal-domain/principal-domain.model.yaml
+      - ../models/principal-node/principal-node.model.yaml
+      - ../models/principal-node/principal-node.lifecycle.yaml
+      - ../models/principal-node/node-runtime-instance.model.yaml
+      - ../models/principal-node/node-runtime-instance.lifecycle.yaml
+      - ../models/principal-node/sync-session.model.yaml
+      - ../models/principal-node/sync-session.lifecycle.yaml
+      - ../models/principal-node/coherence-observation.model.yaml
+      - ../models/node-host/host-capability-claim.model.yaml
+      - ../models/shared/replication-cursor.model.yaml

@@ -6,16 +6,17 @@ command and `doctor` closure land with the managed context CLI
 
 ## Purpose
 
-One-way distribution of the node runtime — relay, CLIs, skills, signing
+One-way distribution of node runtime releases — relay, CLIs, skills, signing
 tooling, and host-adapter assets — from a single development node to
 downstream consumer nodes, over ordinary Git, with releases attributable to
-the same identity that owns the development node's journal.
+the release-signing role associated with the development PrincipalNode. The
+release signer does not become the PrincipalDomain or PrincipalNode identity.
 
 Roles are fixed by policy, not capability:
 
-- **Development node** (`ted-laptop`): the only node where changes to the
-  runtime happen. Builds, specs, and releases originate here.
-- **Consumer node** (downstream hosts): verify, check out, rebuild, test,
+- **Development PrincipalNode** (`ted-laptop`): the only PrincipalNode where
+  runtime changes happen. Builds, specs, and releases originate here.
+- **Consumer PrincipalNodes** (downstream hosts): verify, check out, rebuild, test,
   and generate feedback. Consumer nodes never edit installed executables;
   they configure profiles.
 
@@ -23,10 +24,10 @@ Roles are fixed by policy, not capability:
 
 - Repository: the Git fork both nodes already use.
 - Release = an annotated tag in the `node/vX.Y.Z` namespace.
-- Every release tag is signed with the development node's key
-  (NIP-GS, BIP-340) — the same identity that signs the journal's owner
-  declarations and is publicly attested through the hardware binding
-  statement.
+- Every release tag is signed with the pinned development release key (NIP-GS,
+  BIP-340), publicly attested through the hardware binding statement. That key
+  may currently overlap another operational role, but its release signature is
+  provenance evidence only and never domain-root or PrincipalNode authorization.
 
 Release key (pinned):
 
@@ -34,28 +35,30 @@ Release key (pinned):
 9c2fd8696a630bdf27c3d54394739bb3cbbf81b7cf7fa1e205a806eca33fa90e
 ```
 
-## Node-runtime boundary consequence
+## PrincipalNode boundary consequence
 
-The signed release is evidence consumed by the
-[sovereign node runtime](node-runtime-boundary-v0.1.md). It proves provenance
-and integrity and may declare compatibility; it never authorizes journal
-replay, event admission, declaration changes, or cursor movement.
+The signed release is evidence selected by a PrincipalNode and executed by a
+[NodeRuntimeInstance](principal-node-boundary-v0.1.md). It proves provenance
+and integrity and may declare compatibility; it never identifies a
+PrincipalDomain or PrincipalNode and never authorizes journal replay, event
+admission, declaration changes, or cursor movement.
 
 The current v0.1 channel proves the signed tag and source revision. The target
 promotion contract, to be specified behaviorally before implementation, adds
 a canonical release manifest declaring:
 
 - runtime version, source revision, and artifact digest;
-- supported profile, journal, cursor, checkpoint, and host-manifest schemas;
+- supported profile, journal, cursor, checkpoint, host-claim, and host-binding schemas;
 - the required host capability profile;
 - migration identifiers and compatibility direction.
 
-Before a promoted runtime first mutates durable node state, the node-runtime
-compatibility gate must match that evidence against the existing node context
-and active host binding. A migration must name a precondition, postcondition,
-recovery point, and any irreversible boundary. Rollback selects different
-verified executable bytes; it never rolls journal or committed cursor state
-backward implicitly.
+Before a promoted RuntimeInstance first mutates durable state, the
+PrincipalNode compatibility gate must match that evidence against the current
+PrincipalDomain state, PrincipalNode checkpoint, and active host binding. A
+migration must name a precondition, postcondition, recovery point, and any
+irreversible boundary. Rollback selects different verified executable bytes
+and creates a new RuntimeInstance; it never rolls journal or committed cursor
+state backward implicitly.
 
 ## Consumer procedure
 
@@ -114,9 +117,11 @@ than a checkable one.
 
 ## Traceability
 
-- Runtime boundary:
-  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- Principal Domain and Principal Node boundary:
+  [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)
 - Promotion story:
-  [`../stories/node-runtime/promote-compatible-node-runtime.md`](../stories/node-runtime/promote-compatible-node-runtime.md)
-- Runtime model:
-  [`../models/node-runtime/node-runtime.model.yaml`](../models/node-runtime/node-runtime.model.yaml)
+  [`../stories/principal-node/promote-compatible-node-runtime.md`](../stories/principal-node/promote-compatible-node-runtime.md)
+- PrincipalNode model:
+  [`../models/principal-node/principal-node.model.yaml`](../models/principal-node/principal-node.model.yaml)
+- RuntimeInstance model:
+  [`../models/principal-node/node-runtime-instance.model.yaml`](../models/principal-node/node-runtime-instance.model.yaml)

@@ -36,9 +36,11 @@ the relay provides continuity.
    and fails clearly outside it.
 7. **Progressive infrastructure.** Postgres, Redis, and object storage enter
    only when an experiment actually needs their scaling or media properties.
-8. **Domain before host mechanics.** Synchronization, cursors, retry, and
-   coherence remain inside one portable sovereign node runtime. Hosts provide
-   declared capabilities without becoming domain authority.
+8. **Domain and principal before execution mechanics.** The Principal Domain
+   holds the stable root context and logical journal. Each authorized Principal
+   Node owns synchronization, cursors, retry, checkpoints, and coherence across
+   process and host replacement. Runtime instances and hosts provide execution
+   mechanics without becoming domain authority.
 
 ## First horizon
 
@@ -80,10 +82,12 @@ authorization across those runtimes. Storage, server runtimes, authentication
 methods, replication transport, topology, policy, and asynchronous effects
 remain replaceable adapters.
 
-The [sovereign node runtime boundary](architecture/node-runtime-boundary-v0.1.md)
-names the application layer that composes those adapters around one durable
-node context. It owns synchronization and coherence semantics while host
-adapters provide supervision, placement, custody, clock/wake, session, and
+The [Principal Domain and Principal Node
+boundary](architecture/principal-node-boundary-v0.1.md) names the application
+layer that authorizes one or more durable Principal Nodes for a stable root
+context and logical journal. A PrincipalNode owns synchronization and coherence
+semantics while replaceable NodeRuntimeInstances execute verified releases and
+host adapters provide supervision, placement, custody, clock/wake, session, and
 attestation capabilities.
 
 The first promotion proof is

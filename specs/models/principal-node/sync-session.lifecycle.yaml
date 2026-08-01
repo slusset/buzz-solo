@@ -7,11 +7,11 @@ description: |
 
 sources:
   stories:
-    - specs/stories/node-runtime/place-synchronization-inside-node-runtime.md
+    - specs/stories/principal-node/place-synchronization-inside-principal-node.md
   journeys:
-    - specs/journeys/evolve-a-sovereign-node-runtime.md
+    - specs/journeys/evolve-a-principal-node.md
   architecture:
-    - specs/architecture/node-runtime-boundary-v0.1.md
+    - specs/architecture/principal-node-boundary-v0.1.md
 
 initial_state: requested
 
@@ -48,18 +48,18 @@ transitions:
   begin_evaluation:
     from: requested
     to: evaluating
-    trigger: node_runtime
+    trigger: principal_node
   no_work_needed:
     from: evaluating
     to: completed
-    trigger: node_runtime
+    trigger: principal_node
     guards:
       - agreement-and-transport-ready
       - source-reports-no-new-records
   begin_transfer:
     from: evaluating
     to: transferring
-    trigger: node_runtime
+    trigger: principal_node
     guards:
       - current-agreement-matched
       - transport-ready
@@ -67,7 +67,7 @@ transitions:
   refuse_transfer:
     from: evaluating
     to: blocked
-    trigger: node_runtime
+    trigger: principal_node
     guards:
       - agreement-or-authorization-or-capability-not-ready
   batch_delivered:
@@ -81,13 +81,13 @@ transitions:
   receipts_checkpoint_safe:
     from: awaiting_durable_receipts
     to: committing_cursor
-    trigger: node_runtime
+    trigger: principal_node
     guards:
       - every-covered-record-is-checkpoint-safe
   receipts_not_checkpoint_safe:
     from: awaiting_durable_receipts
     to: failed
-    trigger: node_runtime
+    trigger: principal_node
     guards:
       - at-least-one-record-is-rejected-or-ambiguous
   cursor_durable:
@@ -101,13 +101,13 @@ transitions:
   cancel_at_safe_boundary:
     from: [requested, evaluating]
     to: cancelled
-    trigger: runtime_quiescence
+    trigger: principal_node_quiescence
 
 invalid:
   - transition: wake_directly_to_transfer
     reason: A wake cannot bypass current agreement, authorization, selection, and cursor evaluation.
   - transition: host_commit_cursor
-    reason: The host supplies storage mechanics only; node-runtime policy owns cursor commitment.
+    reason: The host supplies storage mechanics only; PrincipalNode policy owns cursor commitment.
   - transition: rejected_receipt_to_cursor_commit
     reason: Rejection is not checkpoint-safe without a separate durable skip decision.
   - transition: cross_source_cursor_reuse
@@ -115,6 +115,6 @@ invalid:
   - transition: transfer_rewritten_event
     reason: Replication preserves the exact signed event envelope.
   - transition: retry_from_host_scheduler_history
-    reason: Retry derives from node-owned session evidence, not host job history.
+    reason: Retry derives from PrincipalNode-owned session evidence, not host job or RuntimeInstance history.
   - transition: mutate_terminal_attempt_for_retry
     reason: A retry creates a new session referencing the failed or blocked attempt; history remains immutable.

@@ -1,0 +1,267 @@
+id: principal-node
+type: model
+entity: PrincipalNode
+aggregate: PrincipalNode
+description: |
+  A stable operational principal authorized to represent exactly one Principal
+  Domain. It owns node-local continuity and policy orchestration across
+  ephemeral Node Runtime Instances and replaceable hosts.
+
+sources:
+  stories:
+    - specs/stories/principal-node/authorize-principal-node.md
+    - specs/stories/principal-node/place-synchronization-inside-principal-node.md
+    - specs/stories/principal-node/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/principal-node/observe-principal-boundary-coherence.md
+    - specs/stories/principal-node/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-principal-node.md
+  architecture:
+    - specs/architecture/principal-node-boundary-v0.1.md
+    - specs/architecture/node-host-boundary-v0.1.md
+
+identity:
+  fields: [principal_node_id]
+  description: |
+    A stable operational principal. Host labels, process IDs, instance IDs,
+    paths, releases, and rotatable verification keys may change without
+    changing PrincipalNodeId.
+
+attributes:
+  principal_node_id:
+    type: PrincipalNodeId
+    required: true
+    immutable: true
+  principal_domain_id:
+    type: PrincipalDomainId
+    required: true
+    immutable: true
+  domain_authorization:
+    type: DomainAuthorizationReference
+    required: true
+  lifecycle_state:
+    type: enum
+    required: true
+    derived: true
+    values: [proposed, authorized, binding, operational, degraded, blocked, quiescing, offline, revoked]
+    see: principal-node.lifecycle.yaml
+  selected_runtime_release:
+    type: RuntimeReleaseEvidence
+    required: false
+  host_binding:
+    type: HostCapabilityBinding
+    required: false
+  active_runtime_instance:
+    type: NodeRuntimeInstanceReference
+    required: false
+  cursor_heads:
+    type: list<ReplicationCursor>
+    required: true
+    derived: true
+  sync_sessions:
+    type: list<SyncSession>
+    required: true
+    derived: true
+  coherence_observations:
+    type: list<CoherenceObservation>
+    required: true
+    derived: true
+  latest_checkpoint:
+    type: PrincipalNodeCheckpoint
+    required: false
+    derived: true
+
+entities:
+  - name: PrincipalNodeCheckpoint
+    identity: checkpoint_id
+    immutable: true
+    attributes:
+      - checkpoint_id
+      - principal_domain_id
+      - domain_authorization_event_id
+      - principal_node_id
+      - runtime_release_digest
+      - runtime_instance_evidence
+      - domain_journal_head
+      - cursor_heads
+      - profile_digest
+      - host_claim_digest
+      - host_binding_digest
+      - created_at
+      - checkpoint_signer
+      - signature
+    description: |
+      Signed continuity evidence for one Principal Node. It records already
+      durable facts and grants no authority over them.
+  - name: HostCapabilityBinding
+    identity: [principal_node_id, host_claim_digest]
+    attributes:
+      - principal_node_id
+      - host_claim_digest
+      - adapter_id
+      - required_profile
+      - purpose
+      - valid_from
+      - valid_until
+      - compatibility_state
+      - bound_at
+      - binding_signer
+      - binding_signature
+    description: |
+      The Principal Node's signed selection of one verified host capability
+      claim. It permits mechanical calls without importing host identity into
+      Principal Node or Principal Domain identity.
+
+value_objects:
+  - name: PrincipalNodeId
+    representation: stable_principal_uri
+  - name: PrincipalDomainId
+    representation: stable_domain_uri
+  - name: DomainAuthorizationReference
+    representation: [authorization_event_id, principal_domain_id, scope, status]
+  - name: RuntimeReleaseEvidence
+    representation: [version, source_revision, artifact_digest, signature, compatibility_claims]
+  - name: NodeRuntimeInstanceReference
+    representation: [runtime_instance_id, release_digest, host_binding_digest]
+  - name: JournalHead
+    representation: [last_event_id, event_count, content_hash]
+  - name: CapabilityProfile
+    representation: named_versioned_requirement_set
+  - name: NodeCheckpointSignature
+    representation: [checkpoint_key, signed_checkpoint_digest, signature]
+    purpose: Attests continuity evidence without authorizing domain transitions.
+
+relationships:
+  represented_domain:
+    type: belongs-to-exactly-one
+    entity: PrincipalDomain
+    through: domain_authorization
+  active_host_binding:
+    type: has-zero-or-one-current
+    entity: HostCapabilityBinding
+  runtime_instances:
+    type: has-many-over-time
+    entity: NodeRuntimeInstance
+  active_runtime_instance:
+    type: has-zero-or-one-selected
+    entity: NodeRuntimeInstance
+  checkpoints:
+    type: has-many
+    entity: RuntimeCheckpoint
+  synchronization_attempts:
+    type: has-many
+    entity: SyncSession
+  observations:
+    type: has-many-current-by-subject
+    entity: CoherenceObservation
+
+commands:
+  - name: AcceptDomainAuthorization
+    actor: principal_node_operator
+    input: [verified_domain_authorization, principal_node_id]
+    output: authorized_principal_node
+    preconditions:
+      - current domain-root authority verifies the authorization
+      - authorization names this PrincipalNodeId
+      - no different PrincipalDomainId is already bound
+  - name: BindHostCapabilities
+    actor: authorized_principal_node
+    input: [verified_host_capability_claim, required_capability_profile, purpose, valid_from, valid_until]
+    output: signed_host_capability_binding
+    preconditions:
+      - Principal Node domain authorization is current
+      - host claim signature verifies
+      - all required capabilities are declared
+  - name: SelectRuntimeRelease
+    actor: authorized_principal_node
+    input: [verified_release_evidence, domain_head, node_continuity, host_binding]
+    output: compatible_runtime_selection_or_refusal
+  - name: SelectRuntimeInstance
+    actor: authorized_principal_node
+    input: [runtime_instance_evidence, selected_release, host_binding]
+    output: active_runtime_instance_reference
+    preconditions:
+      - instance evidence matches release and host binding
+      - no different active instance selection exists
+  - name: RequestSynchronization
+    actor: principal_node_trigger
+    input: [trigger, current_domain_authorization, current_declarations, source_bound_cursors]
+    output: sync_session
+  - name: ObserveCoherence
+    actor: principal_node
+    input: [invariant_id, subject, bounded_evidence]
+    output: coherence_observation
+    side_effects: none
+  - name: RecordCoherenceObservation
+    actor: authorized_node_identity
+    input: [coherence_observation]
+    output: metadata_only_witness_event
+  - name: CreatePrincipalNodeCheckpoint
+    actor: authorized_principal_node_checkpoint_key
+    input: [domain_authorization, runtime_release, runtime_instance_evidence, domain_journal_head, cursor_heads, profile_digest, host_evidence]
+    output: signed_principal_node_checkpoint
+    preconditions:
+      - every referenced head is already durable
+      - checkpoint digest covers every declared field
+  - name: QuiescePrincipalNode
+    actor: principal_node_operator_or_host_supervisor
+    input: [reason]
+    output: signed_checkpoint_and_quiescing_state
+
+rules:
+  - id: current-domain-authorization-required
+    description: Every new Principal Node operation re-evaluates current authorization from exactly one Principal Domain.
+    enforced: authorization
+  - id: synchronization-is-principal-node-owned
+    description: Stream selection, agreement evaluation, cursors, retries, and completion belong to this aggregate.
+    enforced: domain
+  - id: runtime-instance-is-execution-only
+    description: A Runtime Instance executes selected behavior and cannot create or redefine Principal Node identity or policy.
+    enforced: authorization
+  - id: host-claim-requires-node-binding
+    description: A valid host capability claim is unusable until the Principal Node explicitly binds it for a bounded purpose and validity interval.
+    enforced: authorization
+  - id: release-selection-precedes-instance-mutation
+    description: Release, domain, continuity, and host compatibility verify before an instance mutates durable state.
+    enforced: application
+  - id: observation-is-read-only
+    description: Measuring coherence cannot repair state, append residue, or advance a cursor.
+    enforced: application
+
+invariants:
+  - id: principal-node-is-stable-across-execution
+    description: Restart, crash, release promotion, or host migration never changes PrincipalNodeId.
+  - id: principal-node-represents-one-domain
+    description: A Principal Node has one current PrincipalDomainId and cannot merge authority from another domain.
+  - id: runtime-instance-has-no-independent-authority
+    description: Process existence, PID, executable path, release, and host facts never authorize domain or node operations.
+  - id: host-wakes-carry-no-authority
+    description: A wake conveys only that the Principal Node may evaluate work.
+  - id: cursor-commit-follows-durability
+    description: A source-bound cursor advances only after every covered record has a checkpoint-safe destination outcome.
+  - id: exact-event-envelope-is-preserved
+    description: Synchronization never rewrites event ID, author, kind, tags, content, or signature.
+  - id: checkpoint-signature-is-evidence-not-authority
+    description: A valid checkpoint attests durable heads and cannot make invalid state admissible.
+  - id: critical-coherence-is-never-averaged-away
+    description: Coherence is a vector of named observations; no scalar can conceal a critical violation or unknown.
+  - id: dependency-direction-points-inward
+    description: Runtime, host, transport, storage, release, and interface adapters depend on Principal Node ports.
+
+boundaries:
+  inside:
+    - domain authorization reference and enforcement
+    - stable node lifecycle and instance selection
+    - synchronization and retry classification
+    - source-bound cursor ownership
+    - host capability and release binding
+    - signed continuity checkpoints
+    - coherence invariant evaluation
+  outside:
+    - Principal Domain root authority and journal policy
+    - signed-event verification and relay reduction
+    - process and operating-system APIs
+    - filesystem and secret implementations
+    - network transport implementations
+    - release build and signing production
+    - interface presentation

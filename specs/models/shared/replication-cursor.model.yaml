@@ -1,18 +1,18 @@
 id: replication-cursor
 type: model
 entity: ReplicationCursor
-aggregate: SovereignNodeRuntime
+aggregate: PrincipalNode
 description: |
   An opaque checkpoint position issued by one replication source stream and
-  persisted by the node runtime only after checkpoint-safe destination
+  persisted by the PrincipalNode only after checkpoint-safe destination
   outcomes. It is neither a sequence number nor a host scheduler bookmark.
 
 sources:
   stories:
-    - specs/stories/node-runtime/place-synchronization-inside-node-runtime.md
+    - specs/stories/principal-node/place-synchronization-inside-principal-node.md
   architecture:
     - specs/architecture/portable-relay-boundary.md
-    - specs/architecture/node-runtime-boundary-v0.1.md
+    - specs/architecture/principal-node-boundary-v0.1.md
 
 identity:
   fields: [source_stream_id, opaque_token]
@@ -42,7 +42,7 @@ value_objects:
 
 commands:
   - name: CommitSourceCursor
-    actor: sovereign_node_runtime
+    actor: principal_node
     input: [source_issued_cursor, checkpoint_safe_receipts]
     output: durable_replication_cursor
     preconditions:
@@ -54,8 +54,8 @@ rules:
   - id: source-interprets-token
     description: Only the issuing replication source may interpret, order, or derive meaning from opaque_token.
     enforced: domain
-  - id: runtime-persists-unchanged
-    description: The node runtime stores and returns the exact source-issued value.
+  - id: principal-node-persists-unchanged
+    description: The PrincipalNode stores and returns the exact source-issued value.
     enforced: application
   - id: host-provides-storage-only
     description: A host adapter may supply durable storage mechanics but cannot choose or advance a cursor.
@@ -68,8 +68,8 @@ invariants:
     description: Rejected, ambiguous, or non-durable outcomes cannot be covered without a separate durable skip decision.
   - id: cursor-is-not-parsed-by-destination
     description: The destination and host never parse, increment, compare, rename semantically, or synthesize opaque_token.
-  - id: cursor-survives-runtime-restart
-    description: Recovery depends on durable node-owned cursor state, not in-memory or host scheduler history.
+  - id: cursor-survives-runtime-instance-replacement
+    description: Recovery depends on durable PrincipalNode-owned cursor state, not RuntimeInstance memory or host scheduler history.
 
 boundaries:
   inside:

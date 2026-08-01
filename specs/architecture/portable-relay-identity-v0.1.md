@@ -71,6 +71,11 @@ anonymous reads only through an explicit public-read policy.
 Principal identifiers are names, not proof. Authentication requires evidence
 of current control over an authorized verification method.
 
+Within Buzz Solo, **relay node principal** is the protocol-facing projection
+of `PrincipalNodeId` from the [Principal Domain and Principal Node
+boundary](principal-node-boundary-v0.1.md). It does not identify the
+PrincipalDomain, host, RuntimeInstance, release, or current verification key.
+
 ### Authentication evidence
 
 Authentication evidence is a fresh, audience-bound proof presented at a
@@ -331,7 +336,7 @@ NIP-98, local invocation, or mutually authenticated peer transports.
 - anonymous credentials and selective-disclosure proofs;
 - encryption key distribution;
 - relay discovery, replication scheduling, and checkpoint commitment (owned by
-  the sovereign node runtime outside this identity profile);
+  the PrincipalNode outside this identity profile);
 - an authorization event vocabulary.
 
 ## Traceability
@@ -347,5 +352,5 @@ NIP-98, local invocation, or mutually authenticated peer transports.
   [`../fixtures/portable-relay/identity-v0.1.json`](../fixtures/portable-relay/identity-v0.1.json)
 - Parent boundary:
   [`portable-relay-boundary.md`](portable-relay-boundary.md)
-- Runtime boundary:
-  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- Principal Domain and Principal Node boundary:
+  [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)

@@ -1,21 +1,21 @@
 ---
-id: observe-boundary-coherence
+id: observe-principal-boundary-coherence
 type: story
 refs:
-  journey: specs/journeys/evolve-a-sovereign-node-runtime.md
+  journey: specs/journeys/evolve-a-principal-node.md
   persona: specs/personas/domain-architect.md
-  steps: [2, 3, 5, 6]
+  steps: [2, 3, 4, 6, 7]
 ---
 
-# Story: Observe node-boundary coherence
+# Story: Observe Principal Domain and Node coherence
 
 ## Narrative
 
 As a domain architect,
 I want boundary decisions to produce independently inspectable coherence
 observations,
-So that a running system cannot appear healthy while intent, code, host
-binding, release, or durable state disagree.
+So that a running process cannot appear healthy while domain authorization,
+Principal Node identity, host binding, release, or durable state disagree.
 
 ## Acceptance Criteria
 
@@ -25,11 +25,16 @@ binding, release, or durable state disagree.
   its subject, observer revision, and bounded evidence references.
 - [ ] A critical violation or unknown remains visible even when every other
   invariant is `ok`.
-- [ ] Runtime-boundary coherence detects independently supervised domain jobs,
+- [ ] Principal-boundary coherence detects independently supervised domain jobs,
   host-owned cursor mutation, or a live component graph that contradicts the
-  declared node-runtime boundary.
+  declared Principal Node boundary.
+- [ ] Domain-node coherence verifies that the Principal Node has current
+  authorization from exactly one Principal Domain.
+- [ ] Runtime-instance coherence verifies that an executing process matches the
+  Principal Node's selected release and host binding without becoming its
+  identity.
 - [ ] Host-capability coherence compares node requirements with the active
-  signed host capability manifest.
+  signed host capability claim and PrincipalNode binding.
 - [ ] Release coherence compares the running runtime and adapter revisions with
   verified release evidence without treating the release as journal authority.
 - [ ] Observation reads never repair, reconcile, advance cursors, or alter the
@@ -41,5 +46,6 @@ binding, release, or durable state disagree.
 
 ## Notes
 
-Coherence is evidence about agreement among artifacts. It is not a health
-percentage and it is not an automatic repair mechanism.
+Coherence is evidence about agreement among identities, authority, and
+artifacts. It is not a health percentage and it is not an automatic repair
+mechanism.

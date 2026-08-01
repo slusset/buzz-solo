@@ -179,5 +179,5 @@ boundaries:
     - audit implementation
     - replication transport and peer discovery
     - replication topology and community mapping
-    - cursor storage mechanics and operator-authored dead-letter policy; checkpoint commitment belongs to the SovereignNodeRuntime aggregate
+    - cursor storage mechanics and operator-authored dead-letter policy; checkpoint commitment belongs to the PrincipalNode aggregate
     - distributed availability

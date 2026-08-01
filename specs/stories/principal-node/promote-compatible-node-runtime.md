@@ -2,9 +2,9 @@
 id: promote-compatible-node-runtime
 type: story
 refs:
-  journey: specs/journeys/evolve-a-sovereign-node-runtime.md
+  journey: specs/journeys/evolve-a-principal-node.md
   persona: specs/personas/domain-architect.md
-  steps: [5, 6, 7]
+  steps: [6, 7, 8]
 ---
 
 # Story: Promote a compatible node runtime
@@ -12,10 +12,10 @@ refs:
 ## Narrative
 
 As a domain architect,
-I want a signed runtime release to declare the state and adapter contracts it
-can safely continue,
-So that installation, migration, rollback, and resurrection are verifiable
-transitions rather than host folklore.
+I want a signed runtime release to declare which Principal Node state and
+adapter contracts it can safely continue,
+So that selecting a new Runtime Instance is a verifiable transition rather
+than host folklore.
 
 ## Acceptance Criteria
 
@@ -23,14 +23,15 @@ transitions rather than host folklore.
   profile and state schemas, and required host capability profile.
 - [ ] Verification establishes release provenance and byte integrity before the
   runtime is selected.
-- [ ] Compatibility is checked against the node context and host capabilities
-  before the new runtime mutates durable state.
+- [ ] Compatibility is checked against the Principal Domain, Principal Node
+  continuity state, and bound host capabilities before the new Runtime
+  Instance mutates durable state.
 - [ ] A migration has an explicit precondition, postcondition, recovery point,
   and irreversible boundary if one exists.
 - [ ] Rollback changes executable selection but never rolls the journal or a
   committed replication cursor backward implicitly.
-- [ ] The running runtime can report evidence that matches the selected release
-  manifest.
+- [ ] The Runtime Instance can report evidence that matches the Principal
+  Node's selected release manifest.
 - [ ] A resurrection drill verifies the same compatibility claims on a fresh
   host adapter.
 - [ ] Private keys, journals, cursors, and mutable host state are not embedded
@@ -38,5 +39,5 @@ transitions rather than host folklore.
 
 ## Notes
 
-Release signatures attest provenance and integrity. They do not authorize
-journal transitions or replace replay verification.
+Release signatures attest provenance and integrity. Selecting a release does
+not authorize a Principal Node, journal transition, or replay result.

@@ -1,19 +1,19 @@
 id: coherence-observation
 type: model
 entity: CoherenceObservation
-aggregate: SovereignNodeRuntime
+aggregate: PrincipalNode
 description: |
   A bounded, read-only evaluation of one named invariant against one subject.
   Current coherence is a vector of observations, never a weighted scalar.
 
 sources:
   stories:
-    - specs/stories/node-runtime/observe-boundary-coherence.md
+    - specs/stories/principal-node/observe-principal-boundary-coherence.md
   journeys:
-    - specs/journeys/evolve-a-sovereign-node-runtime.md
+    - specs/journeys/evolve-a-principal-node.md
   architecture:
     - specs/architecture/coherence-monitoring-v0.1.md
-    - specs/architecture/node-runtime-boundary-v0.1.md
+    - specs/architecture/principal-node-boundary-v0.1.md
 
 identity:
   fields: [invariant_id, subject]
@@ -106,7 +106,7 @@ invariants:
   - id: critical-results-remain-visible
     description: A critical violation or unknown remains explicit regardless of other successful observations.
   - id: observation-does-not-change-subject
-    description: Evaluation never repairs projections, changes declarations, advances cursors, or alters host binding.
+    description: Evaluation never repairs projections, changes declarations or authorizations, advances cursors, alters host binding, or selects a RuntimeInstance.
   - id: same-claim-keeps-same-identifier
     description: The same invariant claim uses one identifier at merge, runtime, and resurrection scales.
   - id: unknown-is-evidence-of-limited-observation

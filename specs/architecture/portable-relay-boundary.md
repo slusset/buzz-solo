@@ -167,8 +167,8 @@ The source port returns bounded records in journal order. Each record contains:
 
 Only durable journal events are exportable. Ephemeral events and transient live
 signals never enter a replication batch. A cursor is meaningful only for its
-issuing source stream; the sovereign node runtime persists and returns it
-unchanged rather than parsing, incrementing, or comparing it.
+issuing source stream; the PrincipalNode persists and returns it unchanged
+rather than parsing, incrementing, or comparing it.
 
 The source stream ID is a policy label, not a credential. A network transport
 must authenticate its peer and bind that identity from trusted configuration;
@@ -189,16 +189,17 @@ policy or verification failure from silently creating a permanent gap.
 
 Source acceptance proves neither destination membership nor authorization.
 Private-event selection, community mapping, trust relationships, checkpoint
-commitment, retry classification, and loop topology belong to the sovereign
-node runtime and its configured domain policy. Storage mechanics, clock/wake
+commitment, retry classification, and loop topology belong to the
+PrincipalNode and its configured PrincipalDomain policy. Storage mechanics, clock/wake
 delivery, retention mechanisms, and transport encryption belong to adapters.
 Deployment configuration may provide capabilities and parameters, but it does
 not own synchronization semantics.
 
 The v0.1 port is an application boundary, not a new unauthenticated HTTP route.
-The [sovereign node runtime](node-runtime-boundary-v0.1.md) may carry records
-over NIP-01, HTTP, a queue, direct method calls, or another authenticated
-transport adapter without changing their semantics.
+The [PrincipalNode](principal-node-boundary-v0.1.md) may use its current
+RuntimeInstance to carry records over NIP-01, HTTP, a queue, direct method
+calls, or another authenticated transport adapter without changing their
+semantics.
 
 ## Ingest ordering
 

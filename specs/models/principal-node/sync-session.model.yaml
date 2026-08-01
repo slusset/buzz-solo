@@ -1,29 +1,29 @@
 id: node-sync-session
 type: model
 entity: SyncSession
-aggregate: SovereignNodeRuntime
+aggregate: PrincipalNode
 description: |
-  One node-owned execution of synchronization for one source-bound stream and
-  direction. Different triggers enter the same lifecycle and never carry
-  authority into it.
+  One PrincipalNode-owned synchronization attempt for one source-bound stream
+  and direction. A NodeRuntimeInstance may execute the attempt, but different
+  triggers enter the same lifecycle and never carry authority into it.
 
 sources:
   stories:
-    - specs/stories/node-runtime/place-synchronization-inside-node-runtime.md
+    - specs/stories/principal-node/place-synchronization-inside-principal-node.md
   journeys:
-    - specs/journeys/evolve-a-sovereign-node-runtime.md
+    - specs/journeys/evolve-a-principal-node.md
     - specs/journeys/replicate-shared-context-through-rendezvous.md
   architecture:
-    - specs/architecture/node-runtime-boundary-v0.1.md
+    - specs/architecture/principal-node-boundary-v0.1.md
     - specs/architecture/sovereign-sync-realtime-v0.2-draft.md
 
 identity:
-  fields: [node_principal, session_id]
-  description: A session is one immutable attempt within a node runtime; a later retry is a new session that references the failed or blocked attempt.
+  fields: [principal_node_id, session_id]
+  description: A session is one immutable attempt owned by a PrincipalNode; a later retry is a new session that references the failed or blocked attempt.
 
 attributes:
-  node_principal:
-    type: NodePrincipal
+  principal_node_id:
+    type: PrincipalNodeId
     required: true
     immutable: true
   session_id:
@@ -87,27 +87,27 @@ value_objects:
 
 commands:
   - name: RequestSync
-    actor: node_runtime_trigger
+    actor: principal_node_trigger
     input: [trigger, direction, source_stream_id]
     output: requested_sync_session
   - name: EvaluateCurrentAgreement
-    actor: node_runtime
+    actor: principal_node
     input: [current_declaration_heads, authenticated_transport_evidence]
     output: agreement_snapshot_or_blocked_reason
   - name: TransferBatch
-    actor: node_runtime
+    actor: principal_node
     input: [source_stream_id, source_bound_cursor, agreement_snapshot]
     output: exact_event_envelopes_and_receipts
   - name: ClassifyReceipts
-    actor: node_runtime
+    actor: principal_node
     input: [receipts]
     output: checkpoint_safe_or_retryable_classification
   - name: CommitCursor
-    actor: node_runtime
+    actor: principal_node
     input: [source_bound_cursor, checkpoint_safe_receipts]
     output: durable_cursor_after
   - name: RetrySync
-    actor: node_runtime
+    actor: principal_node
     input: [failed_or_blocked_session, current_declarations]
     output: new_sync_session
     preconditions:
@@ -136,7 +136,9 @@ invariants:
   - id: cursor-never-leads-durable-outcomes
     description: The durable cursor cannot cover a record without a checkpoint-safe destination receipt.
   - id: scheduler-history-is-irrelevant
-    description: Restart and retry derive from node-owned state, never a host scheduler's run history.
+    description: Restart and retry derive from PrincipalNode-owned state, never a host scheduler's run history or a RuntimeInstance's memory.
+  - id: runtime-instance-replacement-does-not-fork-policy
+    description: Replacing the executing RuntimeInstance preserves the PrincipalNode's agreement, cursor, retry, and checkpoint rules.
   - id: zero-record-sync-is-success
     description: A valid evaluation with no new records completes as caught up without manufacturing a cursor transition.
 
