@@ -1,0 +1,125 @@
+id: coherence-observation
+type: model
+entity: CoherenceObservation
+aggregate: SovereignNodeRuntime
+description: |
+  A bounded, read-only evaluation of one named invariant against one subject.
+  Current coherence is a vector of observations, never a weighted scalar.
+
+sources:
+  stories:
+    - specs/stories/node-runtime/observe-boundary-coherence.md
+  journeys:
+    - specs/journeys/evolve-a-sovereign-node-runtime.md
+  architecture:
+    - specs/architecture/coherence-monitoring-v0.1.md
+    - specs/architecture/node-runtime-boundary-v0.1.md
+
+identity:
+  fields: [invariant_id, subject]
+  replacement_semantics: parameterized_replaceable_head
+  description: New observations replace current status for the same invariant and subject without erasing prior evidence.
+
+attributes:
+  invariant_id:
+    type: string
+    required: true
+    immutable: true
+  subject:
+    type: SubjectReference
+    required: true
+    immutable: true
+  status:
+    type: enum
+    required: true
+    values: [ok, drift, violation, unknown]
+  criticality:
+    type: enum
+    required: true
+    values: [informational, required, critical]
+  time_scale:
+    type: enum
+    required: true
+    values: [merge, runtime, resurrection]
+  observer_revision:
+    type: string
+    required: true
+  observed_at:
+    type: timestamp
+    required: true
+  evidence_refs:
+    type: list<EvidenceReference>
+    required: true
+  expected_ref:
+    type: EvidenceReference
+    required: false
+  recorded_event_id:
+    type: EventId
+    required: false
+    description: Present only if a separate authorized append recorded this observation.
+
+value_objects:
+  - name: SubjectReference
+    representation: [subject_kind, stable_subject_id]
+    purpose: Names what was observed without copying its payload.
+  - name: EvidenceReference
+    representation: [evidence_kind, content_digest_or_stable_reference]
+    purpose: Bounded provenance; excludes payload copies, credentials, and host-private identifiers.
+  - name: EventId
+    representation: lowercase_hex_sha256
+
+commands:
+  - name: EvaluateInvariant
+    actor: coherence_observer
+    input: [invariant_id, subject, evidence_refs, observer_revision]
+    output: coherence_observation
+    side_effects: none
+  - name: ComposeCoherenceVector
+    actor: any_surface
+    input: [current_observations]
+    output: named_observations_preserving_each_status
+    side_effects: none
+  - name: RecordObservation
+    actor: authorized_node_identity
+    input: [coherence_observation]
+    output: metadata_only_witness_event
+    preconditions:
+      - observation evaluation has completed
+      - append authorization is independently satisfied
+      - disclosure policy accepts every evidence reference
+
+rules:
+  - id: four-state-result
+    description: Every evaluation returns ok, drift, violation, or unknown; inability to evaluate never becomes ok.
+    enforced: domain
+  - id: status-is-not-averaged
+    description: Presentation may summarize counts but cannot replace named statuses with one score.
+    enforced: presentation
+  - id: evidence-is-bounded
+    description: Observations contain stable references and digests, never credentials, payload copies, or host-private identifiers.
+    enforced: disclosure
+  - id: observer-and-recorder-are-distinct-operations
+    description: Observation is read-only; recording is a separately authorized append.
+    enforced: application
+
+invariants:
+  - id: critical-results-remain-visible
+    description: A critical violation or unknown remains explicit regardless of other successful observations.
+  - id: observation-does-not-change-subject
+    description: Evaluation never repairs projections, changes declarations, advances cursors, or alters host binding.
+  - id: same-claim-keeps-same-identifier
+    description: The same invariant claim uses one identifier at merge, runtime, and resurrection scales.
+  - id: unknown-is-evidence-of-limited-observation
+    description: Missing capability or unavailable evidence produces unknown rather than inferred success.
+
+boundaries:
+  inside:
+    - invariant identity and status vocabulary
+    - evidence-reference disclosure policy
+    - current-observation replacement semantics
+    - coherence-vector composition
+  outside:
+    - automatic repair or reconciliation
+    - alert transport and presentation
+    - subject-specific evidence collection implementation
+    - authorization to append witness residue

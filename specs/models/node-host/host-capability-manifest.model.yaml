@@ -1,0 +1,140 @@
+id: host-capability-manifest
+type: model
+entity: HostCapabilityManifest
+aggregate: HostCapabilityManifest
+description: |
+  A signed host-local declaration of mechanical capabilities available to one
+  node runtime. It describes what an adapter can do without becoming node
+  identity, policy authority, event author, or journal history.
+
+sources:
+  stories:
+    - specs/stories/node-runtime/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/node-runtime/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-sovereign-node-runtime.md
+  architecture:
+    - specs/architecture/node-host-boundary-v0.1.md
+    - specs/architecture/node-runtime-boundary-v0.1.md
+
+identity:
+  fields: [manifest_digest]
+  description: The content digest identifies one immutable signed revision; host_label is presentation only.
+
+attributes:
+  manifest_digest:
+    type: ContentDigest
+    required: true
+    immutable: true
+  manifest_revision:
+    type: string
+    required: true
+    immutable: true
+  adapter_id:
+    type: string
+    required: true
+    immutable: true
+  host_label:
+    type: string
+    required: false
+    immutable: true
+    description: Presentation only; never identity or authority.
+  supervision:
+    type: SupervisionCapability
+    required: true
+  placement:
+    type: PlacementCapability
+    required: true
+  custody:
+    type: list<CustodyCapability>
+    required: true
+  clock_wake:
+    type: ClockWakeCapability
+    required: true
+  sessions:
+    type: SessionCapability
+    required: false
+  attestations:
+    type: list<AttestationCapability>
+    required: true
+  signer:
+    type: HostManifestSigner
+    required: true
+  signature:
+    type: Signature
+    required: true
+
+value_objects:
+  - name: ContentDigest
+    representation: sha256
+  - name: SupervisionCapability
+    representation: [start, stop, restart, health, boot_persistent]
+  - name: PlacementCapability
+    representation: [config_ref, data_ref, state_ref, cache_ref, runtime_ref, durability_claims]
+  - name: CustodyCapability
+    representation: [class, signing_interface, verification_levels, credential_reference_scheme]
+  - name: ClockWakeCapability
+    representation: [monotonic_clock, wall_clock, scheduled_wake, event_wake, minimum_resolution]
+  - name: SessionCapability
+    representation: [os_signals, harness_adapters, process_abandonment_evidence]
+  - name: AttestationCapability
+    representation: [kind, verification_properties]
+  - name: HostManifestSigner
+    representation: host_attestation_principal
+  - name: Signature
+    representation: detached_signature_over_canonical_manifest
+
+commands:
+  - name: DeclareCapabilities
+    actor: host_adapter
+    input: [adapter_revision, capability_references, capability_properties]
+    output: unsigned_canonical_manifest
+  - name: SignManifest
+    actor: host_manifest_signer
+    input: [canonical_manifest]
+    output: signed_host_capability_manifest
+  - name: VerifyManifest
+    actor: node_runtime
+    input: [signed_manifest, trusted_host_attestation_policy]
+    output: verified_manifest_or_refusal
+  - name: MatchCapabilityProfile
+    actor: node_runtime
+    input: [verified_manifest, required_capability_profile]
+    output: [satisfied, degraded, blocked]
+
+rules:
+  - id: manifest-declares-ability-not-authority
+    description: A declared host capability permits a mechanical call only after node-runtime policy chooses it.
+    enforced: authorization
+  - id: references-not-secrets
+    description: Custody and placement fields contain opaque references and properties, never private key bytes or reusable credentials.
+    enforced: disclosure
+  - id: missing-capability-is-explicit
+    description: An unavailable required capability blocks startup; an unavailable optional capability produces declared degradation.
+    enforced: application
+  - id: minimum-profile-is-portable
+    description: Foreground supervision and file-backed development custody can satisfy the minimum profile without launchd or systemd.
+    enforced: conformance
+
+invariants:
+  - id: host-label-is-presentation-only
+    description: Changing host_label does not change manifest signer, node principal, owner, or authority.
+  - id: host-cannot-author-domain-decisions
+    description: The adapter cannot choose streams, interpret cursors, broaden grants, reconcile findings, or append domain events on its own authority.
+  - id: host-mechanisms-remain-external
+    description: Paths, service names, timer mechanisms, and credential identifiers remain outside journal events.
+  - id: equivalent-capabilities-are-observationally-consistent
+    description: Conforming adapters produce the same node-visible outcomes for capabilities they both declare.
+
+boundaries:
+  inside:
+    - host capability vocabulary
+    - canonical signed declaration
+    - host-local references and capability properties
+    - conformance profile matching
+  outside:
+    - node synchronization and retry policy
+    - event and declaration authorship
+    - cursor interpretation and commitment policy
+    - node identity and journal state
+    - OS-specific implementation details behind each capability

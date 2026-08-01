@@ -230,6 +230,6 @@ boundaries:
     - legal identity proofing
     - private key custody and recovery
     - automatic counterparty discovery
-    - scheduling and retry policy
+    - scheduling and retry policy, owned by the SovereignNodeRuntime aggregate
     - user-interface presentation
     - artifact encryption key exchange

@@ -1,0 +1,30 @@
+capability:
+  id: node-runtime-boundary
+  type: capability
+  status: proposed
+  description: |
+    Keep synchronization and coherence semantics inside one portable sovereign
+    node runtime while host adapters provide declared mechanical capabilities
+    and signed releases provide verifiable compatibility evidence.
+  scope:
+    personas:
+      - ../personas/domain-architect.md
+    journeys:
+      - ../journeys/evolve-a-sovereign-node-runtime.md
+    stories:
+      - ../stories/node-runtime/place-synchronization-inside-node-runtime.md
+      - ../stories/node-runtime/declare-host-capabilities-without-domain-authority.md
+      - ../stories/node-runtime/observe-boundary-coherence.md
+      - ../stories/node-runtime/promote-compatible-node-runtime.md
+    architecture:
+      - ../architecture/node-runtime-boundary-v0.1.md
+      - ../architecture/node-host-boundary-v0.1.md
+      - ../architecture/coherence-monitoring-v0.1.md
+    models:
+      - ../models/node-runtime/node-runtime.model.yaml
+      - ../models/node-runtime/node-runtime.lifecycle.yaml
+      - ../models/node-runtime/sync-session.model.yaml
+      - ../models/node-runtime/sync-session.lifecycle.yaml
+      - ../models/node-runtime/coherence-observation.model.yaml
+      - ../models/node-host/host-capability-manifest.model.yaml
+      - ../models/shared/replication-cursor.model.yaml

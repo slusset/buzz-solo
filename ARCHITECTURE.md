@@ -41,6 +41,15 @@ and both the laptop relay and the Cloudflare adapter rehydrate peer trust,
 exports, and readers from declaration heads at startup. A redeploy with
 blank environment variables retains trust from the journal.
 
+The proposed
+[sovereign node runtime boundary](specs/architecture/node-runtime-boundary-v0.1.md)
+places synchronization, source-bound cursors, retry classification, coherence,
+and release compatibility inside one portable application around the relay
+core. Host adapters provide supervision, placement, custody, clock/wake,
+session, and attestation capabilities without becoming domain authority. The
+current independently supervised pull/push jobs are transitional topology, not
+the target boundary.
+
 ## The journal
 
 The node's source of truth is an append-only NDJSON log of verified signed
@@ -70,6 +79,12 @@ projection. See [crates/buzz-cli/CONTEXT.md](crates/buzz-cli/CONTEXT.md).
 
 ## Crate map
 
+This is the current physical crate map. The proposed logical dependency
+direction is portable domain/event kernel ← node-runtime application ←
+composition root, with relay, transport, storage, host, release, and interface
+adapters depending inward. The exact crate split is intentionally deferred
+until behavior contracts are reviewed.
+
 **Solo center** — `buzz-local-relay` (relay + replication/handoff/pulse
 bins) · `buzz-cli`
 
@@ -97,6 +112,10 @@ redeploys and is auditable in the journal.
 **Releases are signatures.** Node runtime releases are signed `node/vX.Y.Z`
 git tags ([node-release-distribution](specs/architecture/node-release-distribution-v0.1.md));
 there is no artifact pipeline to trust.
+
+**Domain before host mechanics.** A host may start, stop, place, wake, and
+surface the node through declared ports. It never selects streams, interprets
+cursors, broadens grants, or decides whether a domain transition is admissible.
 
 ## Lineage
 

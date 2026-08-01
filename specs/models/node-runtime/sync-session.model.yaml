@@ -1,0 +1,155 @@
+id: node-sync-session
+type: model
+entity: SyncSession
+aggregate: SovereignNodeRuntime
+description: |
+  One node-owned execution of synchronization for one source-bound stream and
+  direction. Different triggers enter the same lifecycle and never carry
+  authority into it.
+
+sources:
+  stories:
+    - specs/stories/node-runtime/place-synchronization-inside-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-sovereign-node-runtime.md
+    - specs/journeys/replicate-shared-context-through-rendezvous.md
+  architecture:
+    - specs/architecture/node-runtime-boundary-v0.1.md
+    - specs/architecture/sovereign-sync-realtime-v0.2-draft.md
+
+identity:
+  fields: [node_principal, session_id]
+  description: A session is one immutable attempt within a node runtime; a later retry is a new session that references the failed or blocked attempt.
+
+attributes:
+  node_principal:
+    type: NodePrincipal
+    required: true
+    immutable: true
+  session_id:
+    type: string
+    required: true
+    immutable: true
+  direction:
+    type: enum
+    required: true
+    immutable: true
+    values: [pull, push]
+  source_stream_id:
+    type: string
+    required: true
+    immutable: true
+  trigger:
+    type: enum
+    required: true
+    immutable: true
+    values: [startup, journal_commit, peer_wake, recovery_tick, operator_request, retry]
+  previous_session_id:
+    type: string
+    required: false
+    immutable: true
+    description: Present when this attempt retries a prior blocked or failed session.
+  agreement_snapshot:
+    type: StreamAgreementSnapshot
+    required: true
+  cursor_before:
+    type: ReplicationCursor
+    required: false
+  cursor_after:
+    type: ReplicationCursor
+    required: false
+  lifecycle_state:
+    type: enum
+    required: true
+    derived: true
+    values: [requested, evaluating, transferring, awaiting_durable_receipts, committing_cursor, completed, blocked, failed, cancelled]
+    see: sync-session.lifecycle.yaml
+  receipt_summary:
+    type: ReceiptSummary
+    required: false
+    derived: true
+  outcome:
+    type: SyncOutcome
+    required: false
+    derived: true
+
+value_objects:
+  - name: StreamAgreementSnapshot
+    representation: [stream_id, export_head, admit_head, read_heads, transport_principal, evaluated_at]
+    purpose: Evidence used for this attempt; current heads are re-evaluated on every new attempt.
+  - name: ReplicationCursor
+    representation: [source_stream_id, opaque_token]
+    purpose: An opaque source-issued checkpoint position.
+  - name: ReceiptSummary
+    representation: [stored, duplicate, superseded, rejected, ambiguous]
+  - name: SyncOutcome
+    representation: [classification, records_examined, cursor_committed, evidence_refs]
+
+commands:
+  - name: RequestSync
+    actor: node_runtime_trigger
+    input: [trigger, direction, source_stream_id]
+    output: requested_sync_session
+  - name: EvaluateCurrentAgreement
+    actor: node_runtime
+    input: [current_declaration_heads, authenticated_transport_evidence]
+    output: agreement_snapshot_or_blocked_reason
+  - name: TransferBatch
+    actor: node_runtime
+    input: [source_stream_id, source_bound_cursor, agreement_snapshot]
+    output: exact_event_envelopes_and_receipts
+  - name: ClassifyReceipts
+    actor: node_runtime
+    input: [receipts]
+    output: checkpoint_safe_or_retryable_classification
+  - name: CommitCursor
+    actor: node_runtime
+    input: [source_bound_cursor, checkpoint_safe_receipts]
+    output: durable_cursor_after
+  - name: RetrySync
+    actor: node_runtime
+    input: [failed_or_blocked_session, current_declarations]
+    output: new_sync_session
+    preconditions:
+      - the prior session remains unchanged
+      - the new session references the prior session ID
+
+rules:
+  - id: trigger-is-not-authority
+    description: A trigger selects when to evaluate; it cannot supply trusted stream, agreement, grant, or cursor decisions.
+    enforced: authorization
+  - id: agreement-is-current-per-attempt
+    description: Every attempt derives agreement and transport readiness from current declaration heads and authentication evidence.
+    enforced: domain
+  - id: cursor-is-source-bound
+    description: Cursor equality includes source stream identity and opaque token; cursors never cross source boundaries.
+    enforced: domain
+  - id: receipt-classification-is-fail-closed
+    description: Rejected or ambiguous outcomes prevent cursor commitment unless a separate durable skip decision exists.
+    enforced: domain
+
+invariants:
+  - id: all-triggers-share-lifecycle
+    description: Startup, commit, peer wake, recovery tick, operator request, and retry use this same model.
+  - id: event-envelope-remains-exact
+    description: Event ID, author, kind, tags, content, and signature remain unchanged in transit.
+  - id: cursor-never-leads-durable-outcomes
+    description: The durable cursor cannot cover a record without a checkpoint-safe destination receipt.
+  - id: scheduler-history-is-irrelevant
+    description: Restart and retry derive from node-owned state, never a host scheduler's run history.
+  - id: zero-record-sync-is-success
+    description: A valid evaluation with no new records completes as caught up without manufacturing a cursor transition.
+
+boundaries:
+  inside:
+    - trigger normalization
+    - current agreement and transport evaluation
+    - batch orchestration and receipt classification
+    - retry classification
+    - durable source-bound cursor commitment
+  outside:
+    - event verification and sink ingest semantics
+    - transport socket implementation
+    - host timer and wake delivery mechanism
+    - declaration authorship
+    - operator-authored skip or dead-letter policy

@@ -48,3 +48,11 @@
 | Context binding | The unique, fail-closed association between one harness session and one opted-in bounded context. |
 | Lifecycle residue | Metadata-only start, completion, or interruption evidence written for an agent session inside its context boundary. |
 | Context checkpoint | A local, manifest-last replacement that records accepted artifact drift and repository metadata without implying publication. |
+| Node context | The identity-bound durable aggregate: journal, profile references, declarations, cursors, context heads, artifacts, and checkpoints required for this node to remain this node. |
+| Sovereign node runtime | The portable application boundary that operates one node context and owns synchronization, cursor, retry, coherence, and compatibility semantics. |
+| Host adapter | An OS/runtime-specific implementation of declared supervision, placement, custody, clock/wake, session, or attestation capabilities; it has no domain authority by itself. |
+| Host capability manifest | A signed host-local declaration of mechanical capabilities and opaque references available to a node runtime. |
+| Wake signal | A host or peer indication that the node may evaluate work now; it carries no stream, cursor, grant, or transition authority. |
+| Sync session | One node-owned execution of the common synchronization lifecycle for a source-bound stream and direction. |
+| Coherence observation | A read-only four-state result for one named invariant and subject, with bounded evidence references. |
+| Runtime release | Signed provenance, integrity, and compatibility evidence for executable artifacts; it is never authority over journal state. |

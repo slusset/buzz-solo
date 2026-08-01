@@ -274,9 +274,9 @@ separately: neither implies the other.
 Rule (2)'s pin is the drift detector: if `A` replaces its export declaration
 (new selection ⇒ new stream ID; new readers or metadata ⇒ same `d`, new
 event ID), `B`'s pin goes stale and the match breaks **visibly** until `B`
-re-pins. Tooling SHOULD surface unmatched-declaration state; runtimes MAY
-refuse to serve or ingest unmatched streams (strictness is adapter policy in
-v0.1, normative in a later revision once operational experience accumulates).
+re-pins. Tooling SHOULD surface unmatched-declaration state; node runtimes MAY
+refuse to serve or ingest unmatched streams (strictness is node policy in v0.1,
+normative in a later revision once operational experience accumulates).
 
 ## Artifacts
 
@@ -377,6 +377,8 @@ adapter at each replication request. Three rules:
 - Telos: [`../TELOS.md`](../TELOS.md)
 - Parent boundary:
   [`portable-relay-boundary.md`](portable-relay-boundary.md)
+- Runtime owner:
+  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
 - Replication semantics: the replication profile and
   [selective streams](portable-relay-boundary.md) invariants
   (predicate-is-identity, source-owned cursors, checkpoint-safe receipts)

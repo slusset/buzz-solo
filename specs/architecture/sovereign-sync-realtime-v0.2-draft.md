@@ -16,24 +16,27 @@ the existing scheduled recovery — never a correctness dependency.
 
 ## Design
 
-Three triggers, one procedure:
+Three triggers, one procedure inside the
+[sovereign node runtime](node-runtime-boundary-v0.1.md):
 
 1. **Commit-triggered push.** A durable local journal commit enqueues an
-   immediate, debounced push using the same declared source, stream
-   filters, and profile-owned cursor as scheduled recovery. The debounce
-   window coalesces bursts; the push that runs is byte-for-byte the push
-   the schedule would have run.
+   immediate, debounced synchronization request using the same declared
+   source, stream filters, and node-owned source-bound cursor as recovery.
+   The debounce window coalesces bursts; every request enters the same
+   `SyncSession` lifecycle.
 
 2. **Pulse-triggered pull (peer wake).** When the rendezvous journal head
    advances, it wakes authenticated peer sessions over their existing
    standing sockets — the same sessions the pulse layer already witnesses
-   under `coherence.sessions`. A woken peer runs the same drain as
-   scheduled recovery. This extends the transition-driven drain precedent
-   (`a36cb7b79`) from beacon transitions to head-advance wake.
+   under `coherence.sessions`. A woken peer asks its node runtime to evaluate
+   the same drain procedure as recovery. This extends the transition-driven
+   drain precedent (`a36cb7b79`) from beacon transitions to head-advance wake.
 
-3. **Poll as backstop.** Scheduled timers remain unchanged and are the
-   missed-signal safety net. A lost wake degrades to poll latency, never
-   to data loss.
+3. **Recovery tick as backstop.** The node runtime owns the recovery cadence
+   and requests wakes through the host clock/wake capability. A launchd timer,
+   systemd timer, foreground loop, or platform alarm may deliver the tick, but
+   none owns a second synchronization procedure. A lost wake degrades to
+   recovery-tick latency, never to data loss.
 
 ## Invariants
 
@@ -41,16 +44,16 @@ Three triggers, one procedure:
   "look now," nothing else. Every triggered drain re-evaluates the
   declared export/admit/read agreements exactly as a scheduled drain
   does; no trigger can widen a selection or bypass a grant.
-- **One code path.** Realtime and scheduled replication are the same
+- **One code path.** Realtime and recovery replication are the same
   procedure with different triggers. There is no separate fast path to
   drift from the recovery path.
-- **Cursor integrity.** All triggers share the profile-owned cursor and
-  stream selection. No trigger may fall back to a default cursor or an
+- **Cursor integrity.** All triggers share the node-owned, source-bound cursor
+  and stream selection. No trigger may fall back to a default cursor or an
   unselected stream set — the `context sync` cursor/selection
   passthrough defect reported in `6e0f4231…` is a hard precondition for
   this work, not a parallel concern.
-- **Fail silent, converge on schedule.** Missed wakes are not errors and
-  are not retried at the wake layer; the backstop poll converges them.
+- **Fail silent, converge on node policy.** Missed wakes are not errors and
+  are not retried at the wake layer; the recovery tick converges them.
 - **Pulse-layer discipline.** Wake signals are ephemeral,
   conversation-not-record, per beacon pulse v0.2. Durable state changes
   belong to the journal; the wake layer never becomes a second source of
@@ -72,3 +75,13 @@ Three triggers, one procedure:
 3. Head-advance peer wake at the rendezvous.
 4. Only then, tune backstop intervals down if the realtime path proves
    reliable — never remove them.
+
+## Traceability
+
+- Runtime owner: [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- Sync session model:
+  [`../models/node-runtime/sync-session.model.yaml`](../models/node-runtime/sync-session.model.yaml)
+- Sync lifecycle:
+  [`../models/node-runtime/sync-session.lifecycle.yaml`](../models/node-runtime/sync-session.lifecycle.yaml)
+- Host clock/wake capability:
+  [`node-host-boundary-v0.1.md`](node-host-boundary-v0.1.md)

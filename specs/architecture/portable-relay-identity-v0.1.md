@@ -330,7 +330,8 @@ NIP-98, local invocation, or mutually authenticated peer transports.
 - key generation, custody, recovery, or user-interface flows;
 - anonymous credentials and selective-disclosure proofs;
 - encryption key distribution;
-- relay discovery, replication scheduling, and checkpoint storage;
+- relay discovery, replication scheduling, and checkpoint commitment (owned by
+  the sovereign node runtime outside this identity profile);
 - an authorization event vocabulary.
 
 ## Traceability
@@ -346,3 +347,5 @@ NIP-98, local invocation, or mutually authenticated peer transports.
   [`../fixtures/portable-relay/identity-v0.1.json`](../fixtures/portable-relay/identity-v0.1.json)
 - Parent boundary:
   [`portable-relay-boundary.md`](portable-relay-boundary.md)
+- Runtime boundary:
+  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)

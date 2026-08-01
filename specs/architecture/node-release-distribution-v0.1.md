@@ -7,7 +7,7 @@ command and `doctor` closure land with the managed context CLI
 ## Purpose
 
 One-way distribution of the node runtime — relay, CLIs, skills, signing
-tooling, LaunchAgent templates — from a single development node to
+tooling, and host-adapter assets — from a single development node to
 downstream consumer nodes, over ordinary Git, with releases attributable to
 the same identity that owns the development node's journal.
 
@@ -33,6 +33,29 @@ Release key (pinned):
 ```text
 9c2fd8696a630bdf27c3d54394739bb3cbbf81b7cf7fa1e205a806eca33fa90e
 ```
+
+## Node-runtime boundary consequence
+
+The signed release is evidence consumed by the
+[sovereign node runtime](node-runtime-boundary-v0.1.md). It proves provenance
+and integrity and may declare compatibility; it never authorizes journal
+replay, event admission, declaration changes, or cursor movement.
+
+The current v0.1 channel proves the signed tag and source revision. The target
+promotion contract, to be specified behaviorally before implementation, adds
+a canonical release manifest declaring:
+
+- runtime version, source revision, and artifact digest;
+- supported profile, journal, cursor, checkpoint, and host-manifest schemas;
+- the required host capability profile;
+- migration identifiers and compatibility direction.
+
+Before a promoted runtime first mutates durable node state, the node-runtime
+compatibility gate must match that evidence against the existing node context
+and active host binding. A migration must name a precondition, postcondition,
+recovery point, and any irreversible boundary. Rollback selects different
+verified executable bytes; it never rolls journal or committed cursor state
+backward implicitly.
 
 ## Consumer procedure
 
@@ -88,3 +111,12 @@ than a checkable one.
 - Multi-key or threshold release signing.
 - Revocation of a compromised release key (rotate by publishing a new
   binding statement and re-pinning consumers manually).
+
+## Traceability
+
+- Runtime boundary:
+  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- Promotion story:
+  [`../stories/node-runtime/promote-compatible-node-runtime.md`](../stories/node-runtime/promote-compatible-node-runtime.md)
+- Runtime model:
+  [`../models/node-runtime/node-runtime.model.yaml`](../models/node-runtime/node-runtime.model.yaml)

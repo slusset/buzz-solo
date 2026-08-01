@@ -34,9 +34,10 @@ Carry the node context artifact to the fresh host and hydrate:
 3. Transport the node context artifact (manifest + journal + sealed
    envelope) via an existing authenticated leg (artifact custody or
    direct copy).
-4. Hydrate per the host boundary: placement → journal replay verified
-   against the manifest's `journal_head` (fail closed on mismatch) →
-   custody provisioning → supervision registration.
+4. Hydrate per the host boundary: placement → release and host-capability
+   compatibility gate → journal replay verified against the manifest's
+   `journal_head` (fail closed on mismatch) → custody provisioning →
+   supervision registration of the composed node runtime.
 5. Append a witnessed `node-hydrated` record from the new host.
 
 **Claim proven**: laptop dies, backup exists → node reborn byte-exact.
@@ -48,9 +49,10 @@ Arrive with nothing but key material:
 1. Provision the droplet; fetch and verify the runtime as above.
 2. Instantiate a profile from the carried identity; authenticate to
    Rendezvous.
-3. Drain home every stream the identity is entitled to read under the
-   current declarations — the ordinary drain leg, pointed at an empty
-   journal.
+3. Start the node runtime with the fresh host adapter and request recovery.
+   The runtime evaluates current declarations and drains every stream the
+   identity is entitled to read into the empty journal through its ordinary
+   `SyncSession` procedure.
 4. Unseal what the carried material can unseal (engram ciphertext drains
    like any stream; conversation keys arrive only via the sealed
    envelope or recovery ceremony — never via Rendezvous).
@@ -103,6 +105,8 @@ All of the following, from the droplet:
 - beacon pulses witnessed from the drill node;
 - the hydration/gap witness events are in the journal;
 - variant R only: replay equality against the manifest's journal head;
+- runtime-boundary coherence: synchronization and cursors are node-owned and
+  the fresh host supplies only declared capabilities;
 - teardown complete: droplet destroyed, drill identity's grant revoked,
   revocation observed by
   [coherence monitoring](coherence-monitoring-v0.1.md)'s
@@ -128,9 +132,12 @@ of what else worked.
 
 - Acceptance profile: [`node-host-boundary-v0.1.md`](node-host-boundary-v0.1.md)
   (`node-host-migration-v0.1`, node context manifest, hydration)
+- Runtime boundary:
+  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
 - Runtime channel: [`node-release-distribution-v0.1.md`](node-release-distribution-v0.1.md)
 - Trust vocabulary: [`sovereign-sync-agreement-v0.1-draft.md`](sovereign-sync-agreement-v0.1-draft.md)
-- Drain leg: `buzz-relay-pull` (`crates/buzz-local-relay`)
+- Recovery procedure:
+  [`../models/node-runtime/sync-session.lifecycle.yaml`](../models/node-runtime/sync-session.lifecycle.yaml)
 - Sibling scale: [`coherence-monitoring-v0.1.md`](coherence-monitoring-v0.1.md)
 - Drill-not-assertion precedent: recovery envelope rule in
   [`node-host-boundary-v0.1.md`](node-host-boundary-v0.1.md) passkey profile

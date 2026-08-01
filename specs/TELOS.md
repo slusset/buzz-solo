@@ -36,6 +36,9 @@ the relay provides continuity.
    and fails clearly outside it.
 7. **Progressive infrastructure.** Postgres, Redis, and object storage enter
    only when an experiment actually needs their scaling or media properties.
+8. **Domain before host mechanics.** Synchronization, cursors, retry, and
+   coherence remain inside one portable sovereign node runtime. Hosts provide
+   declared capabilities without becoming domain authority.
 
 ## First horizon
 
@@ -76,6 +79,12 @@ preserves the separation between event author, caller, relay peer, and local
 authorization across those runtimes. Storage, server runtimes, authentication
 methods, replication transport, topology, policy, and asynchronous effects
 remain replaceable adapters.
+
+The [sovereign node runtime boundary](architecture/node-runtime-boundary-v0.1.md)
+names the application layer that composes those adapters around one durable
+node context. It owns synchronization and coherence semantics while host
+adapters provide supervision, placement, custody, clock/wake, session, and
+attestation capabilities.
 
 The first promotion proof is
 [`portable-relay-cloudflare-v0.1`](architecture/portable-relay-cloudflare-v0.1.md):

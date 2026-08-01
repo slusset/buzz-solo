@@ -8,8 +8,15 @@ Date: 2026-07-31
 The sovereign node binds to its host machine through declared **host
 capability ports**, the same way the portable relay core binds to runtimes
 through relay ports. A host adapter declares what its host can do —
-supervision, secret custody, session signals, attestation, placement — and
-the node consumes those capabilities without ever touching OS APIs directly.
+supervision, placement, secret custody, clock/wake delivery, session signals,
+and attestation — and the node consumes those capabilities without ever
+touching OS APIs directly.
+
+The consumer of these ports is the portable
+[sovereign node runtime](node-runtime-boundary-v0.1.md). The host never runs a
+parallel domain workflow: it may start, stop, and wake the node runtime, but it
+does not own synchronization, cursor advancement, retry semantics, agreement
+evaluation, or coherence policy.
 
 Two things become first-class that are conventions today:
 
@@ -29,12 +36,14 @@ mechanism that seals key material and gates capability minting.
 
 ## Why this boundary exists
 
-The node currently binds to exactly one host by convention: hardcoded
-`~/.buzz-local` paths, a hand-written launchd plist, plaintext key files
-resolved by `reference` paths, an agent skill that loads and saves context
-by discipline, and a NIP-OA capability that silently expires after 30 days
-and is rebound by hand. It works because there is one machine and one
-careful operator. None of it is declared, so none of it travels:
+The 2026-08-01 XDG migration exposed how the node had bound to exactly one host
+by convention: legacy `~/.buzz-local` paths, hand-written launchd plists,
+plaintext key files resolved by `reference` paths, separate pull/push jobs, an
+agent skill that loads and saves context by discipline, and a NIP-OA
+capability that silently expires after 30 days and is rebound by hand. Moving
+the files made placement clearer, but did not itself declare the host contract.
+The arrangement works because there is one machine and one careful operator;
+without a capability boundary it does not travel:
 
 - a second host (Linux box, new laptop, future phone) has no defined
   hydration path — the peel left "many nodes" as topology without a
@@ -49,27 +58,30 @@ careful operator. None of it is declared, so none of it travels:
 ## Layered bounded contexts
 
 The question "what is the bounded context around the portable local relay"
-resolves into three nested contexts with existing specs owning two of them:
+resolves into three nested contexts and one application boundary:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │ HOST CONTEXT — machine, OS session, authenticators,        │
 │ harnesses. Reached only through host capability ports.     │
 │  ┌───────────────────────────────────────────────────────┐ │
-│  │ NODE CONTEXT — the sovereign aggregate: journal,      │ │
-│  │ profile + identity role references, capabilities,     │ │
-│  │ bounded attention contexts, artifact manifests.       │ │
-│  │ Serializable as the node context manifest (below).    │ │
-│  │  ┌──────────────────────────────────────────────────┐ │ │
-│  │  │ PORTABLE RELAY CORE — events, filters,           │ │ │
-│  │  │ decisions. Owned by portable-relay-boundary.     │ │ │
-│  │  └──────────────────────────────────────────────────┘ │ │
+│  │ NODE RUNTIME — portable application boundary:         │ │
+│  │ lifecycle, sync, cursors, coherence, compatibility.   │ │
+│  │  ┌──────────────────────┐ ┌─────────────────────────┐ │ │
+│  │  │ NODE CONTEXT         │ │ PORTABLE RELAY CORE     │ │ │
+│  │  │ identity-bound state │ │ events, filters,        │ │ │
+│  │  │ journal + cursors    │ │ decisions               │ │ │
+│  │  └──────────────────────┘ └─────────────────────────┘ │ │
 │  └───────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────┘
 ```
 
 - The **relay core** is already bounded by
   [portable-relay-boundary](portable-relay-boundary.md).
+- The **node runtime** is bounded by
+  [node-runtime-boundary](node-runtime-boundary-v0.1.md). It is the
+  application that operates the node context and consumes host ports; it is
+  not another durable identity.
 - The **attention contexts** inside the node are already bounded by the
   [bounded-attention-context model](../models/sticky-attention/bounded-attention-context.model.yaml):
   membership is the `h` tag, briefs are deterministic projections, and
@@ -80,25 +92,33 @@ resolves into three nested contexts with existing specs owning two of them:
   one. This spec bounds it against the host.
 
 Facts inside the host context (which launchd label, which keychain item,
-which credential ID) never appear in journal events. Facts inside the node
-context never depend on a particular host's representation.
+which credential ID, which timer implementation) never appear in journal
+events. Facts inside the node context never depend on a particular host's
+representation.
 
 ## Host capability ports
 
 ### Supervision
 
-Ensure the relay process runs, restarts after crash and boot, and reports
-health. Adapters: launchd agent (macOS, today's `com.buzz.local-relay`),
-systemd user unit, foreground process, container, Durable Object alarm.
-Minimum conformance: manual foreground invocation.
+Ensure the composed node runtime runs, restarts after crash and boot, and
+reports process health. Adapters: launchd agent, systemd user unit, foreground
+process, container, Durable Object alarm. Minimum conformance: manual
+foreground invocation.
+
+Supervision treats the node runtime as the unit of lifecycle. Independently
+supervised pull, push, cursor, or coherence jobs are transitional compatibility
+topology and fail the target runtime-boundary coherence invariant if they make
+domain decisions outside the node runtime.
 
 ### Placement
 
-Resolve where the nest, profile, journal, and content-addressed artifact
-store live (`~/.buzz-local` + `~/.config/buzz` today; XDG on Linux).
-Placement is queried, never assumed — no other component may hardcode a
-path. Placement also owns durability facts the manifest needs (filesystem
-identity, last-verified replay).
+Resolve where config, durable node data, operational state, cache, installed
+runtime releases, and content-addressed artifacts live. The current macOS
+adapter uses the XDG-shaped layout under `~/.config`, `~/.local/share`,
+`~/.local/state`, and `~/.local/lib`; another host may represent the same
+roles differently. Placement is queried, never assumed — no other component
+may hardcode a path. Placement also reports durability facts the manifest
+needs (filesystem identity, last-verified replay).
 
 ### Secret custody
 
@@ -125,6 +145,19 @@ operational use (`ssh-keygen -Y` binding of key A, serial 38031585): the
 non-Nostr key attests the Nostr key, and the custody port records which
 identities carry hardware attestation. Authenticators authorize and seal;
 they never author events.
+
+### Clock and wake
+
+Provide wall and monotonic clocks plus scheduled and event-driven wake
+delivery. The host chooses how a wake is delivered — launchd timer, systemd
+timer, foreground loop, process callback, or platform alarm — and declares
+its resolution and persistence properties.
+
+The node runtime owns cadence, debounce, retry classification, and what work a
+wake causes. A wake means only “evaluate now.” It carries no trusted stream,
+cursor, grant, peer policy, or reconciliation decision. A missed wake is
+handled by the node runtime's recovery policy, not by a second host-owned sync
+procedure.
 
 ### Session signals
 
@@ -172,8 +205,9 @@ A host adapter declares, in one signed document per host:
 {
   host_label,                      # presentation only, never identity
   supervision:  { kind, boot_persistent },
-  placement:    { nest, config, artifact_store },
+  placement:    { config, data, state, cache, runtime, artifact_store },
   custody:      [ {class, verification_levels, attestation} ],
+  clock_wake:   { clocks, scheduled, event_driven, minimum_resolution },
   sessions:     { os_signals: [...], harness_adapters: [...] },
   attestation:  [ supported forms ]
 }
@@ -263,8 +297,8 @@ at their heads. One journal, many contexts, one manifest per node.
 ## Conformance sketch
 
 - `node-host-core-v0.1` — placement + `file` custody + manual
-  supervision + manifest dehydrate/hydrate round trip on one host. (The
-  current laptop setup, named.)
+  supervision + foreground clock/wake + manifest dehydrate/hydrate round trip
+  on one host. (The current laptop setup, named.)
 - `node-host-session-v0.1` — OS session seal/unseal policy honored;
   agent-session hooks carried per the durable-context-hooks contract with
   host-confirmed abandonment evidence.
@@ -279,6 +313,7 @@ at their heads. One journal, many contexts, one manifest per node.
 ## Non-goals
 
 - No change to relay protocol semantics or the portable relay boundary.
+- No host ownership of synchronization, cursor, retry, or coherence semantics.
 - No multi-owner or shared-host semantics.
 - No biometric identity claims — a ceremony proves *an enrolled
   authenticator verified its user*, nothing more.
@@ -304,6 +339,10 @@ at their heads. One journal, many contexts, one manifest per node.
 
 - Telos: [`../TELOS.md`](../TELOS.md)
 - Relay boundary: [`portable-relay-boundary.md`](portable-relay-boundary.md)
+- Node runtime boundary:
+  [`node-runtime-boundary-v0.1.md`](node-runtime-boundary-v0.1.md)
+- Host capability model:
+  [`../models/node-host/host-capability-manifest.model.yaml`](../models/node-host/host-capability-manifest.model.yaml)
 - Identity profile: [`portable-relay-identity-v0.1.md`](portable-relay-identity-v0.1.md)
 - Agent-session surface:
   [`../contracts/agent-harness/durable-context-hooks.yaml`](../contracts/agent-harness/durable-context-hooks.yaml)

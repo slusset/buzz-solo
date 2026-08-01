@@ -1,0 +1,112 @@
+id: sovereign-node-runtime-lifecycle
+type: model
+entity: SovereignNodeRuntime
+description: |
+  Lifecycle of the portable application runtime operating one sovereign node.
+  States distinguish missing host capabilities, incompatibility, degraded
+  optional capabilities, and deliberate quiescence.
+
+sources:
+  stories:
+    - specs/stories/node-runtime/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/node-runtime/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-sovereign-node-runtime.md
+  architecture:
+    - specs/architecture/node-runtime-boundary-v0.1.md
+
+initial_state: unbound
+
+states:
+  unbound:
+    description: No verified host capability manifest is selected.
+    terminal: false
+  starting:
+    description: Release, node context, host capabilities, and durable replay are being verified.
+    terminal: false
+  ready:
+    description: Every required capability and compatibility claim is satisfied.
+    terminal: false
+  degraded:
+    description: Required continuity guarantees hold, but one or more optional capabilities are unavailable or unhealthy.
+    terminal: false
+  blocked:
+    description: A required capability, compatibility claim, identity, or replay invariant failed closed.
+    terminal: false
+  quiescing:
+    description: New work is refused while active transitions reach a checkpoint-safe boundary.
+    terminal: false
+  stopped:
+    description: A final runtime checkpoint exists and no node-owned transition is active.
+    terminal: false
+
+transitions:
+  bind_host:
+    from: [unbound, stopped, blocked]
+    to: starting
+    trigger: node_operator
+    guards:
+      - host-manifest-signature-verifies
+      - required-capability-profile-declared
+  verify_and_start:
+    from: starting
+    to: ready
+    trigger: node_runtime
+    guards:
+      - release-evidence-verifies
+      - runtime-state-schema-compatible
+      - journal-replay-verifies
+      - required-host-capabilities-resolve
+  start_degraded:
+    from: starting
+    to: degraded
+    trigger: node_runtime
+    guards:
+      - every-required-capability-resolves
+      - only-optional-capabilities-are-missing
+  fail_start_closed:
+    from: starting
+    to: blocked
+    trigger: node_runtime
+    guards:
+      - required-capability-or-invariant-failed
+  observe_optional_capability_loss:
+    from: ready
+    to: degraded
+    trigger: coherence_observation
+  recover_optional_capability:
+    from: degraded
+    to: ready
+    trigger: coherence_observation
+    guards:
+      - all-required-and-selected-optional-capabilities-are-coherent
+  observe_required_violation:
+    from: [ready, degraded]
+    to: blocked
+    trigger: coherence_observation
+  request_quiescence:
+    from: [ready, degraded, blocked]
+    to: quiescing
+    trigger: node_operator_or_host_supervisor
+  finish_quiescence:
+    from: quiescing
+    to: stopped
+    trigger: node_runtime
+    guards:
+      - no-transition-is-in-flight
+      - checkpoint-safe-cursors-persisted
+      - final-runtime-checkpoint-written
+  restart:
+    from: stopped
+    to: starting
+    trigger: node_operator_or_host_supervisor
+
+invalid:
+  - transition: host_signal_directly_to_ready
+    reason: A host signal cannot bypass release, context, replay, and capability verification.
+  - transition: blocked_to_ready_without_reverification
+    reason: A failed required invariant must be re-evaluated explicitly.
+  - transition: stop_with_active_sync_session
+    reason: Shutdown waits for a checkpoint-safe boundary or records an interrupted session for retry.
+  - transition: optional_loss_to_blocked_by_implicit_policy
+    reason: Required and optional capabilities are declared; adapters cannot silently strengthen policy.

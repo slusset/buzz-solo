@@ -1,0 +1,120 @@
+id: node-sync-session-lifecycle
+type: model
+entity: SyncSession
+description: |
+  The single synchronization lifecycle used by startup, commit, wake,
+  recovery, operator, and retry triggers.
+
+sources:
+  stories:
+    - specs/stories/node-runtime/place-synchronization-inside-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-sovereign-node-runtime.md
+  architecture:
+    - specs/architecture/node-runtime-boundary-v0.1.md
+
+initial_state: requested
+
+states:
+  requested:
+    description: A trigger requested evaluation and supplied no domain authority.
+    terminal: false
+  evaluating:
+    description: Current declarations, transport evidence, selection, and source-bound cursor are being evaluated.
+    terminal: false
+  transferring:
+    description: A bounded batch of exact signed event envelopes is moving through source and sink ports.
+    terminal: false
+  awaiting_durable_receipts:
+    description: Destination outcomes are being classified against checkpoint-safety rules.
+    terminal: false
+  committing_cursor:
+    description: Every covered record is checkpoint-safe and the source-bound cursor is being persisted durably.
+    terminal: false
+  completed:
+    description: The stream is caught up through the committed cursor, including the valid zero-record case.
+    terminal: true
+  blocked:
+    description: Current agreement, authorization, or required capability does not permit transfer.
+    terminal: true
+  failed:
+    description: A retryable transport, storage, or ambiguous receipt failure prevented safe completion.
+    terminal: true
+  cancelled:
+    description: Quiescence or explicit operator action stopped the session at a checkpoint-safe boundary.
+    terminal: true
+
+transitions:
+  begin_evaluation:
+    from: requested
+    to: evaluating
+    trigger: node_runtime
+  no_work_needed:
+    from: evaluating
+    to: completed
+    trigger: node_runtime
+    guards:
+      - agreement-and-transport-ready
+      - source-reports-no-new-records
+  begin_transfer:
+    from: evaluating
+    to: transferring
+    trigger: node_runtime
+    guards:
+      - current-agreement-matched
+      - transport-ready
+      - cursor-belongs-to-source-stream
+  refuse_transfer:
+    from: evaluating
+    to: blocked
+    trigger: node_runtime
+    guards:
+      - agreement-or-authorization-or-capability-not-ready
+  batch_delivered:
+    from: transferring
+    to: awaiting_durable_receipts
+    trigger: replication_sink
+  transport_failure:
+    from: transferring
+    to: failed
+    trigger: transport_adapter
+  receipts_checkpoint_safe:
+    from: awaiting_durable_receipts
+    to: committing_cursor
+    trigger: node_runtime
+    guards:
+      - every-covered-record-is-checkpoint-safe
+  receipts_not_checkpoint_safe:
+    from: awaiting_durable_receipts
+    to: failed
+    trigger: node_runtime
+    guards:
+      - at-least-one-record-is-rejected-or-ambiguous
+  cursor_durable:
+    from: committing_cursor
+    to: completed
+    trigger: cursor_store
+  cursor_write_failed:
+    from: committing_cursor
+    to: failed
+    trigger: cursor_store
+  cancel_at_safe_boundary:
+    from: [requested, evaluating]
+    to: cancelled
+    trigger: runtime_quiescence
+
+invalid:
+  - transition: wake_directly_to_transfer
+    reason: A wake cannot bypass current agreement, authorization, selection, and cursor evaluation.
+  - transition: host_commit_cursor
+    reason: The host supplies storage mechanics only; node-runtime policy owns cursor commitment.
+  - transition: rejected_receipt_to_cursor_commit
+    reason: Rejection is not checkpoint-safe without a separate durable skip decision.
+  - transition: cross_source_cursor_reuse
+    reason: A cursor is meaningful only for the source stream that issued it.
+  - transition: transfer_rewritten_event
+    reason: Replication preserves the exact signed event envelope.
+  - transition: retry_from_host_scheduler_history
+    reason: Retry derives from node-owned session evidence, not host job history.
+  - transition: mutate_terminal_attempt_for_retry
+    reason: A retry creates a new session referencing the failed or blocked attempt; history remains immutable.
