@@ -158,6 +158,7 @@ fn referenced_hashes(journal: &str) -> BTreeSet<String> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    buzz_local_relay::install_rustls_provider();
     let config = Config::from_args()?;
     let source_keys = read_keys(&config.source_key_file, "source reader")?;
     let destination_keys = read_keys(&config.destination_key_file, "destination owner")?;

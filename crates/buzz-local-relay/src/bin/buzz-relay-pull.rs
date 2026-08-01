@@ -127,6 +127,7 @@ fn persist_cursor(path: &PathBuf, cursor: &str) -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    buzz_local_relay::install_rustls_provider();
     let config = Config::from_args()?;
     let secret = std::fs::read_to_string(&config.key_file)
         .with_context(|| format!("failed to read key file {}", config.key_file.display()))?;

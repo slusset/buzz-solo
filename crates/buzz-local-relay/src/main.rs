@@ -11,7 +11,8 @@ use buzz_core::replication::ReplicationSourceId;
 use buzz_local_relay::declarations::admit_domain_from_journal;
 use buzz_local_relay::identity::{LocalIdentityAdapter, RelayPeerTrust};
 use buzz_local_relay::{
-    parse_bind_address, serve, EventStore, LocalRelay, ReplicationSourceAllowlist, StorageMode,
+    install_rustls_provider, parse_bind_address, serve, EventStore, LocalRelay,
+    ReplicationSourceAllowlist, StorageMode,
 };
 use nostr::{Keys, PublicKey, SecretKey};
 use tokio::net::TcpListener;
@@ -144,6 +145,7 @@ impl Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    install_rustls_provider();
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),

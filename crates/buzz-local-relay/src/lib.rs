@@ -11,6 +11,16 @@ pub mod declarations;
 /// Laptop NIP-42/NIP-98 authentication and authorization adapter.
 pub mod identity;
 
+/// Select the process-level Rustls provider used by local relay clients.
+///
+/// The workspace intentionally builds both Rustls providers through different
+/// HTTP/WebSocket dependencies. Rustls cannot choose between them implicitly,
+/// so every local-relay executable installs the same provider before creating
+/// an HTTPS or WSS client.
+pub fn install_rustls_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
