@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.buzz.relay-pull</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@BUZZ_RUNTIME_ROOT@/scripts/buzz-drain</string>
+    <string>--watch</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BUZZ_RUNTIME_HOME</key>
+    <string>@BUZZ_RUNTIME_ROOT@</string>
+    <key>BUZZ_CTX_HOME</key>
+    <string>@BUZZ_DATA_ROOT@</string>
+    <key>BUZZ_NODE_KEY</key>
+    <string>@BUZZ_CREDENTIALS_ROOT@/node.key</string>
+    <key>BUZZ_PULL_CURSOR_DIR</key>
+    <string>@BUZZ_DATA_ROOT@/cursors</string>
+    <key>BUZZ_CTX_CLOUD</key>
+    <string>@BUZZ_RENDEZVOUS_URL@</string>
+    <key>BUZZ_CTX_LOCAL</key>
+    <string>http://127.0.0.1:7777</string>
+    <key>BUZZ_PULSE_WITNESS</key>
+    <string>@BUZZ_PULSE_WITNESS@</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>@BUZZ_STATE_ROOT@/logs/relay-pull.log</string>
+  <key>StandardErrorPath</key>
+  <string>@BUZZ_STATE_ROOT@/logs/relay-pull.log</string>
+</dict>
+</plist>

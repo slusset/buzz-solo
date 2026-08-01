@@ -104,7 +104,7 @@ hooks. Nothing else is required — the Solo relay needs no external services.
 ### Running the Relay
 
 ```bash
-just local-relay   # durable Solo relay — no Docker or external services
+just local-relay   # isolated XDG dev relay on port 3100 — no Docker/services
 ```
 
 ---

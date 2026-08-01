@@ -102,12 +102,32 @@ security:
 
 # ─── Run ──────────────────────────────────────────────────────────────────────
 
-# Start the durable sovereign relay (no external services)
+# Initialize the isolated XDG development profile and data directories.
+init-dev-profile:
+    ./scripts/init-buzz-dev-profile.sh
+
+# Start the durable development relay (no external services).
+# The default is XDG_DATA_HOME/buzz-local-relay/dev on port 3100. Pass
+# --ephemeral for a disposable in-memory run or explicit relay flags as needed.
 local-relay *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     export PATH="{{justfile_directory()}}/bin:$PATH"
-    cargo run -p buzz-local-relay -- {{ARGS}}
+    data_root="${BUZZ_DEV_DATA_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/buzz-local-relay/dev}"
+    mkdir -p "$data_root/artifacts" "$data_root/cursors"
+    cargo run -p buzz-local-relay -- \
+        --bind "${BUZZ_DEV_BIND_ADDR:-127.0.0.1:3100}" \
+        --data "$data_root/sovereign.ndjson" \
+        --artifacts "$data_root/artifacts" \
+        {{ARGS}}
+
+# Build an immutable, manifest-bearing node runtime package.
+node-build:
+    ./scripts/build-node-release.sh
+
+# Install a previously built node runtime package and atomically update current.
+node-install package:
+    ./scripts/install-node-release.sh "{{package}}"
 
 # ─── Cloudflare ──────────────────────────────────────────────────────────────
 

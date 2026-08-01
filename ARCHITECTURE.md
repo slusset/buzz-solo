@@ -44,7 +44,8 @@ blank environment variables retains trust from the journal.
 ## The journal
 
 The node's source of truth is an append-only NDJSON log of verified signed
-events (`~/.buzz-local/sovereign.ndjson` in the standard install). Restarting
+events (`${XDG_DATA_HOME:-$HOME/.local/share}/buzz-local-relay/<profile>/sovereign.ndjson`
+in the managed install). Restarting
 the relay recovers the effective history from the log. On top of it:
 
 - **Context heads** — NIP-AE engrams (kind 30174, NIP-44 encrypted,

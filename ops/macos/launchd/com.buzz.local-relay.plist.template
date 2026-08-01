@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.buzz.local-relay</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@BUZZ_RUNTIME_ROOT@/bin/buzz-local-relay</string>
+    <string>--bind</string>
+    <string>127.0.0.1:7777</string>
+    <string>--data</string>
+    <string>@BUZZ_DATA_ROOT@/sovereign.ndjson</string>
+    <string>--artifacts</string>
+    <string>@BUZZ_DATA_ROOT@/artifacts</string>
+    <string>--relay-key</string>
+    <string>@BUZZ_CREDENTIALS_ROOT@/relay.key</string>
+    <string>--require-auth</string>
+    <string>--peer-trust</string>
+    <string>@BUZZ_PEER_TRUST@</string>
+    <string>--owner</string>
+    <string>@BUZZ_OWNER_PUBKEY@</string>
+    <string>--node-label</string>
+    <string>@BUZZ_NODE_LABEL@</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BUZZ_RUNTIME_HOME</key>
+    <string>@BUZZ_RUNTIME_ROOT@</string>
+    <key>BUZZ_CTX_HOME</key>
+    <string>@BUZZ_DATA_ROOT@</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>@BUZZ_STATE_ROOT@/logs/relay.log</string>
+  <key>StandardErrorPath</key>
+  <string>@BUZZ_STATE_ROOT@/logs/relay.log</string>
+</dict>
+</plist>

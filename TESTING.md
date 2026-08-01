@@ -18,7 +18,8 @@ bash + jq against repo scripts.
 
 ```bash
 . ./bin/activate-hermit
-just local-relay                     # ws://127.0.0.1:3000, durable log
+just init-dev-profile
+just local-relay                     # ws://127.0.0.1:3100, XDG dev log
 just local-relay --ephemeral         # disposable in-memory run
 ```
 
@@ -26,7 +27,7 @@ Build the CLI and drive it:
 
 ```bash
 cargo build --release -p buzz-cli
-export BUZZ_RELAY_URL=ws://127.0.0.1:3000
+export BUZZ_RELAY_URL=ws://127.0.0.1:3100
 export BUZZ_PRIVATE_KEY=<hex key>    # dev key; never a real identity
 ./target/release/buzz --help
 ```

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.buzz.relay-push</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@BUZZ_RUNTIME_ROOT@/bin/buzz-relay-push</string>
+    <string>--data</string>
+    <string>@BUZZ_DATA_ROOT@/sovereign.ndjson</string>
+    <string>--to</string>
+    <string>@BUZZ_RENDEZVOUS_URL@</string>
+    <string>--source</string>
+    <string>@BUZZ_SOURCE_ID@</string>
+    <string>--key</string>
+    <string>@BUZZ_CREDENTIALS_ROOT@/node.key</string>
+    <string>--cursor-file</string>
+    <string>@BUZZ_DATA_ROOT@/cursors/push.cursor</string>
+    <string>--streams</string>
+    <string>@BUZZ_DATA_ROOT@/streams.json</string>
+  </array>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>StandardOutPath</key>
+  <string>@BUZZ_STATE_ROOT@/logs/relay-push.log</string>
+  <key>StandardErrorPath</key>
+  <string>@BUZZ_STATE_ROOT@/logs/relay-push.log</string>
+</dict>
+</plist>

@@ -18,7 +18,24 @@ use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
 const DEFAULT_BIND_ADDRESS: &str = "127.0.0.1:3000";
-const DEFAULT_EVENT_LOG: &str = ".buzz-local/events.ndjson";
+
+fn default_event_log() -> PathBuf {
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .filter(|value| !value.is_empty())
+                .map(|home| PathBuf::from(home).join(".local/share"))
+        });
+    data_home
+        .map(|root| {
+            root.join("buzz-local-relay")
+                .join("default")
+                .join("sovereign.ndjson")
+        })
+        .unwrap_or_else(|| PathBuf::from(".buzz-local/events.ndjson"))
+}
 
 struct Config {
     bind_address: String,
@@ -37,7 +54,7 @@ impl Config {
             .unwrap_or_else(|_| DEFAULT_BIND_ADDRESS.to_string());
         let mut event_log = std::env::var("BUZZ_LOCAL_RELAY_DATA")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from(DEFAULT_EVENT_LOG));
+            .unwrap_or_else(|_| default_event_log());
         let mut ephemeral = false;
         let mut require_auth = std::env::var("BUZZ_LOCAL_RELAY_REQUIRE_AUTH")
             .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "yes"));
@@ -337,6 +354,7 @@ fn load_peer_trust(path: &PathBuf) -> anyhow::Result<Vec<(ReplicationSourceId, R
 }
 
 fn print_help() {
+    let default_event_log = default_event_log();
     println!(
         "\
 buzz-local-relay — durable single-process Buzz relay
@@ -347,7 +365,7 @@ Usage:
 
 Options:
   --bind IP:PORT  Listener address (default: {DEFAULT_BIND_ADDRESS})
-  --data PATH     Append-only event log (default: {DEFAULT_EVENT_LOG})
+  --data PATH     Append-only event log (default: {})
   --ephemeral     Keep events in memory only
   --require-auth  Require NIP-42 WebSocket and NIP-98 HTTP authentication
   --peer-trust PATH  JSON trust config admitting replication peers (needs --require-auth)
@@ -368,7 +386,8 @@ Environment:
   BUZZ_LOCAL_RELAY_ARTIFACTS
   BUZZ_LOCAL_RELAY_RELAY_KEY
   BUZZ_LOCAL_RELAY_OWNER
-  BUZZ_LOCAL_RELAY_NODE_LABEL"
+  BUZZ_LOCAL_RELAY_NODE_LABEL",
+        default_event_log.display()
     );
 }
 

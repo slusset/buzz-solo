@@ -6,6 +6,11 @@
 # only the few historical command spellings that predate that command group.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUZZ_CONTEXT_BIN="${BUZZ_CONTEXT_BIN:-}"
+if [ -z "$BUZZ_CONTEXT_BIN" ] && [ -x "$SCRIPT_DIR/../bin/buzz" ]; then
+  BUZZ_CONTEXT_BIN="$SCRIPT_DIR/../bin/buzz"
+fi
 BUZZ_CONTEXT_BIN="${BUZZ_CONTEXT_BIN:-buzz}"
 
 case "${1:-}" in

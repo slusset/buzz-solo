@@ -14,10 +14,11 @@
 # then add the stream ID below.
 set -uo pipefail
 
-HOME_DIR="${BUZZ_CTX_HOME:-$HOME/.buzz-local}"
+STATE_HOME="${BUZZ_CTX_HOME:-$HOME/.buzz-local}"
+RUNTIME_HOME="${BUZZ_RUNTIME_HOME:-$STATE_HOME}"
 FROM="${BUZZ_CTX_CLOUD:-https://buzz-portable-relay.ted-slusser-a00.workers.dev}"
 TO="${BUZZ_CTX_LOCAL:-http://127.0.0.1:7777}"
-KEY="$HOME_DIR/node.key"
+KEY="${BUZZ_NODE_KEY:-$STATE_HOME/node.key}"
 
 STREAMS=(
   shared/buzz-evolution-v1
@@ -27,10 +28,10 @@ STREAMS=(
 
 if [ "${1:-}" = "--watch" ]; then
   WITNESS="${BUZZ_PULSE_WITNESS:?BUZZ_PULSE_WITNESS must pin the rendezvous witness pubkey}"
-  exec "$HOME_DIR/bin/buzz-pulse-watch" \
+  exec "$RUNTIME_HOME/bin/buzz-pulse-watch" \
     --relay "$FROM" \
     --local "$TO" \
-    --journal "$HOME_DIR/sovereign.ndjson" \
+    --journal "$STATE_HOME/sovereign.ndjson" \
     --key "$KEY" \
     --witness "$WITNESS" \
     --command "$0"
@@ -42,9 +43,23 @@ if [ "$#" -ne 0 ]; then
 fi
 
 status=0
+CURSOR_DIR="${BUZZ_PULL_CURSOR_DIR:-}"
+if [ -n "$CURSOR_DIR" ]; then
+  mkdir -p "$CURSOR_DIR"
+fi
 for stream in "${STREAMS[@]}"; do
-  cursor="$HOME_DIR/sovereign.ndjson.pull-cursor.${stream//\//-}"
-  if ! "$HOME_DIR/bin/buzz-relay-pull" \
+  stream_suffix="${stream//\//-}"
+  legacy_cursor="$STATE_HOME/sovereign.ndjson.pull-cursor.$stream_suffix"
+  if [ -n "$CURSOR_DIR" ]; then
+    cursor="$CURSOR_DIR/pull-$stream_suffix.cursor"
+  elif [ -f "$legacy_cursor" ]; then
+    cursor="$legacy_cursor"
+  else
+    CURSOR_DIR="$STATE_HOME/cursors"
+    mkdir -p "$CURSOR_DIR"
+    cursor="$CURSOR_DIR/pull-$stream_suffix.cursor"
+  fi
+  if ! "$RUNTIME_HOME/bin/buzz-relay-pull" \
       --from "$FROM" --to "$TO" \
       --source "$stream" --key "$KEY" \
       --cursor-file "$cursor" 2>&1 | sed "s|^|[$stream] |"; then

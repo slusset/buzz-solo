@@ -28,6 +28,7 @@ pub struct DoctorReport {
     pub runtime: Vec<RuntimeDoctor>,
     pub cursors: Vec<CursorDoctor>,
     pub installation: InstallationDoctor,
+    pub warnings: Vec<String>,
     pub secret_redaction: &'static str,
 }
 
@@ -108,7 +109,7 @@ struct ReleaseManifest {
 
 pub fn version_report() -> VersionReport {
     VersionReport {
-        version: env!("CARGO_PKG_VERSION"),
+        version: option_env!("BUZZ_NODE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
         git_revision: option_env!("BUZZ_GIT_REVISION")
             .or(option_env!("VERGEN_GIT_SHA"))
             .unwrap_or("unknown"),
@@ -202,8 +203,69 @@ pub async fn diagnose(
         runtime,
         cursors: cursor_statuses(&profile.cursors),
         installation: installation_status(profile),
+        warnings: layout_warnings(profile),
         secret_redaction: "private credential material is never included",
     }
+}
+
+fn layout_warnings(profile: &ResolvedProfile) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    if profile.data_root == profile.legacy_root && profile.data_root.is_dir() {
+        warnings.push(format!(
+            "data root uses legacy layout {}; migrate it before treating the profile as portable",
+            profile.data_root.display()
+        ));
+    }
+
+    if profile.journal.is_file() && !profile.artifacts.is_dir() {
+        warnings.push(format!(
+            "journal exists but configured artifact directory is missing: {}",
+            profile.artifacts.display()
+        ));
+    }
+
+    if profile.journal.is_file()
+        && profile.file.replication.source.is_some()
+        && !profile.cursors.is_dir()
+    {
+        warnings.push(format!(
+            "replication is configured but cursor directory is missing: {}",
+            profile.cursors.display()
+        ));
+    }
+
+    if let Some(streams_file) = profile.file.replication.streams_file.as_deref() {
+        if !streams_file.is_file() {
+            warnings.push(format!(
+                "replication streams file is configured but missing: {}",
+                streams_file.display()
+            ));
+        }
+    }
+
+    for (name, path) in [
+        (
+            "handoff_reducer",
+            profile.file.runtime.handoff_reducer.as_deref(),
+        ),
+        ("relay_push", profile.file.runtime.relay_push.as_deref()),
+        (
+            "graph_renderer",
+            profile.file.runtime.graph_renderer.as_deref(),
+        ),
+    ] {
+        if let Some(path) = path {
+            if path.starts_with(&profile.data_root) {
+                warnings.push(format!(
+                    "runtime {name} is installed inside mutable data root {}; use an immutable release directory",
+                    profile.data_root.display()
+                ));
+            }
+        }
+    }
+
+    warnings
 }
 
 async fn relay_status(role: &'static str, url: &str, offline: bool) -> RelayDoctor {
@@ -358,7 +420,7 @@ fn installation_status(profile: &ResolvedProfile) -> InstallationDoctor {
         };
     };
     let matches = executable_sha256.as_deref() == Some(manifest.sha256.as_str())
-        && manifest.version == env!("CARGO_PKG_VERSION")
+        && manifest.version == version_report().version
         && (version_report().git_revision == "unknown"
             || manifest.git_revision == version_report().git_revision);
     InstallationDoctor {
@@ -459,6 +521,9 @@ pub fn print_doctor(report: &DoctorReport, json: bool) -> Result<(), CliError> {
         );
     }
     println!("  install      {}", report.installation.status);
+    for warning in &report.warnings {
+        println!("  warning      {warning}");
+    }
     println!("  secrets      {}", report.secret_redaction);
     Ok(())
 }

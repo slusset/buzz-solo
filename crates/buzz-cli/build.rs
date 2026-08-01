@@ -3,6 +3,10 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=BUZZ_GIT_REVISION");
+    println!("cargo:rerun-if-env-changed=BUZZ_NODE_VERSION");
+    if let Ok(version) = std::env::var("BUZZ_NODE_VERSION") {
+        println!("cargo:rustc-env=BUZZ_NODE_VERSION={version}");
+    }
     if std::env::var_os("BUZZ_GIT_REVISION").is_some() {
         return;
     }

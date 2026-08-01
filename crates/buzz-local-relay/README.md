@@ -14,15 +14,16 @@ From the repository root:
 
 ```bash
 . ./bin/activate-hermit
+just init-dev-profile
 just local-relay
 ```
 
 Defaults:
 
-- WebSocket: `ws://127.0.0.1:3000/`
-- HTTP: `http://127.0.0.1:3000`
-- Event log: `.buzz-local/events.ndjson`
-- Relay-state key: `.buzz-local/events.ndjson.relay-key`
+- WebSocket: `ws://127.0.0.1:3100/` for `just local-relay`
+- HTTP: `http://127.0.0.1:3100`
+- Development event log: `${XDG_DATA_HOME:-$HOME/.local/share}/buzz-local-relay/dev/sovereign.ndjson`
+- Direct binary event log: `${XDG_DATA_HOME:-$HOME/.local/share}/buzz-local-relay/default/sovereign.ndjson`
 
 Options:
 
@@ -98,12 +99,13 @@ production `buzz-relay` when an experiment needs them.
 ## Inspect and move the log
 
 Each line is a complete signed Nostr event. The relay replays all valid lines
-and applies replacement semantics to rebuild the effective state:
+and applies replacement semantics to rebuild the effective state. For a live
+node, pass the journal and artifact paths explicitly from its profile:
 
 ```bash
-wc -l .buzz-local/events.ndjson
-head -n 1 .buzz-local/events.ndjson | jq
-cp .buzz-local/events.ndjson /path/to/backup.ndjson
+wc -l /path/to/data/sovereign.ndjson
+head -n 1 /path/to/data/sovereign.ndjson | jq
+cp /path/to/data/sovereign.ndjson /path/to/backup.ndjson
 ```
 
 Ephemeral kinds (`20000..29999`) are delivered live and never written.

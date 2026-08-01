@@ -64,7 +64,8 @@ examples/             # countdown-bot, meadow-core persona pack
 
 ```bash
 . ./bin/activate-hermit   # activate hermit toolchain (Rust, Node, etc.)
-just local-relay          # durable Solo relay at ws://127.0.0.1:3000
+just init-dev-profile
+just local-relay          # isolated XDG dev relay at ws://127.0.0.1:3100
 just ci                   # run before any PR
 ```
 
@@ -138,8 +139,9 @@ Sovereign-node operation is profile-driven
 cargo build --release -p buzz-cli
 ```
 
-Binary location: `./target/release/buzz`. Add `./target/release` to `PATH`
-or invoke with the full path.
+Binary location: `./target/release/buzz`. For an installed runtime, use
+`just node-build` and `just node-install`; do not copy binaries into the
+durable data directory.
 
 All reads return sig-stripped JSON arrays; all writes return
 `{event_id, accepted, message}`; creates add the entity ID. Exit codes:

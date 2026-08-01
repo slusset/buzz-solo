@@ -47,7 +47,8 @@ protocol-compatible with upstream; the shared-vocabulary conversation lives in
   `scripts/test-buzz-ctx-graph.sh`), run on every CI push.
 - **Node releases** — signed `node/vX.Y.Z` git tags per
   [node-release-distribution-v0.1](specs/architecture/node-release-distribution-v0.1.md).
-  No release pipeline, no artifacts service: the tag signature is the channel.
+  Local packages are built with `just node-build` and installed through an
+  immutable `current` symlink; there is still no hosted release service.
 
 ## Quick start
 
@@ -57,12 +58,14 @@ No Docker, Postgres, or Redis.
 ```bash
 git clone https://github.com/slusset/buzz-solo.git && cd buzz-solo
 . ./bin/activate-hermit
+just init-dev-profile
 just local-relay
 ```
 
-The relay listens on `ws://127.0.0.1:3000` and writes verified signed events
-to `.buzz-local/events.ndjson`. Use `--ephemeral` for a disposable in-memory
-run, or `--data /path/to/events.ndjson` to place the portable log elsewhere.
+The development relay listens on `ws://127.0.0.1:3100` and writes verified
+signed events to the XDG development data root. Use `--ephemeral` for a
+disposable in-memory run, or pass an explicit `--data /path/to/events.ndjson`
+for a controlled experiment.
 
 Build the node CLI:
 
@@ -74,6 +77,10 @@ cargo build --release -p buzz-cli
 See the [local relay guide](crates/buzz-local-relay/README.md) and the
 [managed context CLI guide](crates/buzz-cli/CONTEXT.md) for profiles,
 identity roles, migration, and replication.
+
+See [development and runtime environments](docs/development-and-runtime.md)
+for the development/runtime boundary, package installation, and supervision
+layout.
 
 ## Specs
 

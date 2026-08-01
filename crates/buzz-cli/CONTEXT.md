@@ -17,6 +17,7 @@ lifecycle logic.
 | Journal | `<data_root>/sovereign.ndjson` |
 | Artifact cache | `<data_root>/artifacts/` |
 | Replication cursors | `<data_root>/cursors/` |
+| Runtime logs | `${XDG_STATE_HOME:-$HOME/.local/state}/buzz/<profile>/logs/` |
 
 `BUZZ_CTX_HOME` is an explicit compatibility override. When set, the profile
 is read from `<BUZZ_CTX_HOME>/profile.toml`, or a solo-compatible profile is
@@ -97,6 +98,12 @@ relay_push = "/opt/buzz/releases/0.1.0/bin/buzz-relay-push"
 release_manifest = "/opt/buzz/releases/0.1.0/release.json"
 ```
 
+For a user-managed macOS installation, the equivalent runtime root is usually
+`$HOME/.local/lib/buzz`; because TOML paths do not expand shell variables,
+write the absolute `current` path into the profile. Development profiles should
+leave `runtime` and `installation` unset and use the checkout through `cargo`
+or `just local-relay`.
+
 Credential fields are provider references, never embedded private keys.
 `provider = "file"` names a private file, `environment` names an environment
 variable, and `public_key` is verification-only. An `auth_tag` path may attach
@@ -142,7 +149,9 @@ no-migration compatibility path.
 
 ## Install and update
 
-Install each build into an immutable, versioned directory and atomically move
+The repository provides `just node-build` and `just node-install` for the
+immutable package flow described here. Install each build into an immutable,
+versioned directory and atomically move
 the operator-controlled `current` symlink after validation. Do not overwrite a
 running executable. A release manifest is JSON:
 
