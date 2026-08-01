@@ -125,7 +125,7 @@ local-relay *ARGS:
 node-build:
     ./scripts/build-node-release.sh
 
-# Install a previously built node runtime package and atomically update current.
+# Install a previously built node runtime package and safely update current.
 node-install package:
     ./scripts/install-node-release.sh "{{package}}"
 

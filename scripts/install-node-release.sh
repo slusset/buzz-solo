@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install a previously built node runtime and atomically advance current.
+# Install a previously built node runtime and safely advance current.
 set -euo pipefail
 
 die() {
@@ -49,12 +49,33 @@ cp -R "$PACKAGE/." "$STAGING/"
 mv "$STAGING" "$RELEASE_DIR"
 trap - EXIT
 
-if [ -e "$ROOT/current" ] && [ ! -L "$ROOT/current" ]; then
+CURRENT="$ROOT/current"
+if [ -e "$CURRENT" ] && [ ! -L "$CURRENT" ]; then
   die "runtime current path is not a symlink: $ROOT/current"
 fi
 NEXT_LINK="$ROOT/.current.$$"
+PREVIOUS_LINK="$ROOT/.current.previous.$$"
+current_moved=0
+restore_current() {
+  rm -f "$NEXT_LINK"
+  if [ "$current_moved" -eq 1 ] \
+    && [ ! -e "$CURRENT" ] \
+    && [ -L "$PREVIOUS_LINK" ]; then
+    mv "$PREVIOUS_LINK" "$CURRENT" || true
+  fi
+  rm -f "$PREVIOUS_LINK"
+}
+trap restore_current EXIT
+
 ln -s "releases/$VERSION" "$NEXT_LINK"
-mv -f "$NEXT_LINK" "$ROOT/current"
+if [ -e "$CURRENT" ] || [ -L "$CURRENT" ]; then
+  mv "$CURRENT" "$PREVIOUS_LINK"
+  current_moved=1
+fi
+mv "$NEXT_LINK" "$CURRENT"
+current_moved=0
+rm -f "$PREVIOUS_LINK"
+trap - EXIT
 
 echo "installed node runtime: $RELEASE_DIR"
 echo "source revision: $GIT_SHA"

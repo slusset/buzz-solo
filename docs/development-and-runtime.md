@@ -53,8 +53,8 @@ revision, and writes `release.json`. The installer copies the package into:
 ${BUZZ_RUNTIME_ROOT:-$HOME/.local/lib/buzz}/releases/<version>/
 ```
 
-It then atomically advances `current`. It never overwrites an existing
-versioned release. Restart supervised services explicitly after an install.
+It then safely advances `current` without overwriting an existing versioned
+release. Restart supervised services explicitly after an install.
 
 ## Live state and supervision
 
