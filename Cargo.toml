@@ -16,6 +16,10 @@ members = [
     "crates/buzz-local-relay",
     "crates/buzz-dev-mcp",
     "examples/countdown-bot",
+    "examples/nostr-basics/01-event-envelope/rust",
+    "examples/nostr-basics/02-publish-ack/rust",
+    "examples/nostr-basics/03-subscribe-filter/rust",
+    "examples/nostr-basics/04-relay-bridge/rust",
 ]
 resolver = "2"
 

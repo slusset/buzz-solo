@@ -16,3 +16,14 @@ See [`countdown-bot/README.md`](countdown-bot/README.md) for usage.
 ## `meadow-core/`
 
 A persona-pack example for Buzz agents.
+
+## `nostr-basics/`
+
+A paired Rust and Go learning path for NIP-01. The projects start with signed
+event envelopes, then move through `EVENT`/`OK`, `REQ`/`EVENT`/`EOSE`/`CLOSE`,
+and finally a small relay bridge that behaves as a client to two relays.
+
+See [`nostr-basics/README.md`](nostr-basics/README.md). The bridge is useful
+for visualizing `client <-> relay <-> peer-relay`, but NIP-01 does not define a
+relay-to-relay protocol: the bridge is an ordinary client process with two
+WebSocket connections.

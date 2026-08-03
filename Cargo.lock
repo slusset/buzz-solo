@@ -1894,6 +1894,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "nostr-01-event-envelope"
+version = "0.1.0"
+dependencies = [
+ "nostr",
+ "serde_json",
+]
+
+[[package]]
+name = "nostr-02-publish-ack"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "nostr",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
+name = "nostr-03-subscribe-filter"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "nostr",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
+name = "nostr-04-relay-bridge"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "nostr",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
