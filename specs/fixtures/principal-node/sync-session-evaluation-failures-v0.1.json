@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-evaluation-failures-v0.1",
+    "type": "fixture",
+    "description": "Granular pre-transfer operational failures committed as durable evaluation-failure facts.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Fail evaluation with granular operational evidence",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "prior_state": "evaluating",
+  "transition": "evaluation_failure",
+  "terminal_state": "failed",
+  "cursor_committed": false,
+  "cases": [
+    {
+      "failure": "durable cursor load fails",
+      "classification": "cursor_load_failed",
+      "evidence_ref": "evaluation-failure:cursor-load:001"
+    },
+    {
+      "failure": "peer transport is unavailable",
+      "classification": "transport_unavailable",
+      "evidence_ref": "evaluation-failure:transport:001"
+    },
+    {
+      "failure": "current projection fails",
+      "classification": "projection_unavailable",
+      "evidence_ref": "evaluation-failure:projection:001"
+    },
+    {
+      "failure": "replication source fails",
+      "classification": "source_unavailable",
+      "evidence_ref": "evaluation-failure:source:001"
+    },
+    {
+      "failure": "source batch is malformed",
+      "classification": "malformed_source_batch",
+      "evidence_ref": "evaluation-failure:batch:001"
+    }
+  ],
+  "expected": {
+    "terminal_summary_durable_before_state_exposure": true,
+    "same_session_continuity_retry_on_persistence_ambiguity": true
+  }
+}

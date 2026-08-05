@@ -1,0 +1,15 @@
+Principal Node SyncSession focused verification
+Certified at: 2026-08-05T04:40:41Z
+
+Command:
+  . ./bin/activate-hermit && cargo fmt --all --check && cargo test -p buzz-principal-node && cargo clippy -p buzz-principal-node --all-targets -- -D warnings
+
+Result:
+  PASS
+  contract_fixtures.rs: 9 passed, 0 failed, 0 skipped
+  sync_service.rs: 17 passed, 0 failed, 0 skipped
+  rustdoc: 0 failed
+  clippy: 0 warnings at -D warnings
+  rustfmt: clean
+
+Total focused tests: 26 passed, 0 failed, 0 skipped

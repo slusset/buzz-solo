@@ -1,0 +1,60 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-receipts-v0.1",
+    "type": "fixture",
+    "description": "Fail-closed receipt classification vectors for cursor commitment.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Fail closed when a receipt is not checkpoint-safe",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "record_binding": {
+    "source": "shared/clinical-review-v1",
+    "cursor": "opaque:batch-002",
+    "event_id": "d892a65e7677e0554ebb70ee16deeb6a0727dba46450fb4bc001291d7bff971b"
+  },
+  "cases": [
+    {
+      "outcome": "stored",
+      "durable": true,
+      "checkpoint_safe": true,
+      "next_transition": "receipts_checkpoint_safe",
+      "cursor_commit_permitted": true
+    },
+    {
+      "outcome": "duplicate",
+      "durable": true,
+      "checkpoint_safe": true,
+      "next_transition": "receipts_checkpoint_safe",
+      "cursor_commit_permitted": true
+    },
+    {
+      "outcome": "superseded",
+      "durable": true,
+      "checkpoint_safe": true,
+      "next_transition": "receipts_checkpoint_safe",
+      "cursor_commit_permitted": true
+    },
+    {
+      "outcome": "rejected",
+      "durable": true,
+      "checkpoint_safe": false,
+      "next_transition": "receipts_not_checkpoint_safe",
+      "cursor_commit_permitted": false
+    },
+    {
+      "outcome": "ambiguous",
+      "durable": false,
+      "checkpoint_safe": false,
+      "next_transition": "receipts_not_checkpoint_safe",
+      "cursor_commit_permitted": false
+    },
+    {
+      "outcome": "stored",
+      "durable": false,
+      "checkpoint_safe": false,
+      "next_transition": "receipts_not_checkpoint_safe",
+      "cursor_commit_permitted": false
+    }
+  ]
+}

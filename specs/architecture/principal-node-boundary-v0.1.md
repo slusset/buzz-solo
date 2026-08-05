@@ -174,13 +174,39 @@ For each attempt, the Principal Node:
 2. resolves the configured source stream and exact source-bound cursor;
 3. derives current agreement and transport readiness from signed declaration
    heads and authenticated transport evidence;
-4. asks a replication source for a bounded batch;
-5. delivers exact signed envelopes through the destination's normal sink;
-6. classifies every receipt under checkpoint-safety rules;
-7. persists the source-issued cursor unchanged only after every covered record
-   is durably checkpoint-safe;
-8. commits a terminal session summary or retry classification to Principal
-   Node continuity state.
+4. asks a replication source for exactly one bounded page and accepts the
+   source's unchanged-or-advanced classification of its opaque `next_cursor`;
+5. blocks an unauthenticated peer as `transport_not_ready`, while cursor-load,
+   transport-unavailable, projection-unavailable, source-unavailable, and
+   malformed-source-batch failures durably record distinct evaluation-failure
+   evidence before exposing `failed`;
+6. treats an empty advanced page as successful `scan_progress` (or `caught_up`
+   when the source says caught up), commits no receipt evidence, and treats an
+   empty non-caught-up unchanged page as malformed to prevent livelock;
+7. delivers exact signed envelopes through the destination's normal sink;
+8. classifies every receipt under checkpoint-safety rules;
+9. for a cursor-advancing completion, atomically compares the expected
+   continuity cursor and commits the exact source-issued cursor together with
+   the immutable completed terminal summary through Principal Node continuity
+   after every selected returned record is durably checkpoint-safe, or with
+   zero receipts when the page contains only source-filtered scan progress;
+10. for completed no-work, blocked, failed, or cancelled outcomes, commits the
+   immutable terminal summary without a cursor mutation before exposing the
+   terminal state.
+
+Zero-record scan progress is safe because a source stream's selection predicate
+is bound to its immutable `SourceStreamId`; excluded durable source records do
+not require sink receipts. Redefining that predicate requires a new stream
+identity and fresh cursor lineage. The Principal Node does not parse or order
+the opaque token, and an initial no-position equivalence is declared by the
+source rather than synthesized by the destination.
+
+Continuity transitions are committed facts. If continuity persistence is
+unavailable or reports an ambiguous result, the attempt returns a typed pending
+continuity result containing its prior lifecycle state and exact immutable
+candidate commit. Retrying that candidate uses the same `SyncSession` ID and
+either commits it or observes `already_committed_same`; conflicting content
+fails closed and no new retry session is created.
 
 Replacing a Runtime Instance does not create a new cursor lineage, selection,
 or retry policy. The host clock/wake port may deliver “evaluate now,” and a
@@ -258,8 +284,10 @@ technology providing it.
 - **Relay ingest/query** — normal signed-event decisions and explicit queries.
 - **Replication source/sink** — bounded exact envelopes and source-bound
   receipts as defined by the portable relay boundary.
-- **Cursor store** — durable get/compare/commit of opaque source-bound cursors;
-  storage supplies atomicity but never interprets the token.
+- **Sync continuity** — durable cursor and terminal-summary reads, immutable
+  non-cursor terminal commits, and idempotent atomic compare-and-commit of an
+  exact source-bound cursor with its completed summary; storage supplies
+  atomicity but never interprets the token or changes a pending candidate.
 - **Checkpoint store** — signed Principal Node checkpoints bound to selected
   release, domain journal head, cursor heads, active profile digest, and host
   claim/binding digests. Signatures attest evidence and never make invalid
@@ -305,7 +333,7 @@ adapters depend inward:
 - Principal Domain types contain no process, host, transport, release, path,
   or environment-variable code;
 - Principal Node use cases depend on narrow traits such as
-  `DomainAuthority`, `CursorStore`, `ClockWake`, `HostCapabilities`,
+  `DomainAuthority`, `SyncContinuity`, `ClockWake`, `HostCapabilities`,
   `ReplicationTransport`, and `ReleaseVerifier`;
 - the Runtime Instance composition root chooses concrete implementations and
   translates startup/OS failures;

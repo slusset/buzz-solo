@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-empty-batch-v0.1",
+    "type": "fixture",
+    "description": "A caught-up empty page preserves the required source next_cursor without a durable cursor transition.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Complete an empty caught-up page without cursor progress",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "request": {
+    "principal_node_id": "principal-node:home",
+    "direction": "pull",
+    "source_stream_id": "shared/clinical-review-v1",
+    "trigger": "recovery_tick"
+  },
+  "issued_session_id": "sync-session:empty-003",
+  "cursor_before": {
+    "source_stream_id": "shared/clinical-review-v1",
+    "opaque_token": "opaque:batch-002"
+  },
+  "source_page": {
+    "batch": {
+      "records": [],
+      "next_cursor": "opaque:batch-002",
+      "caught_up": true
+    },
+    "cursor_progress": "unchanged"
+  },
+  "expected": {
+    "continuity_operation": "persist_terminal",
+    "cursor_compare_and_commit_called": false,
+    "cursor_after": null,
+    "terminal_state": "completed",
+    "outcome": "caught_up",
+    "records_examined": 0,
+    "cursor_committed": false,
+    "summary_durable_before_terminal_exposure": true,
+    "initial_no_position_equivalent": {
+      "cursor_before": null,
+      "source_issued_next_cursor": "opaque:initial",
+      "source_classification": "unchanged",
+      "cursor_commit_permitted": false
+    }
+  }
+}

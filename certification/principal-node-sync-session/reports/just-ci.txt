@@ -1,0 +1,24 @@
+Buzz Solo repository gate
+Certified at: 2026-08-05T04:40:41Z
+
+Command:
+  . ./bin/activate-hermit && just ci
+
+Result:
+  PASS, exit code 0
+
+Observed lanes:
+  - cargo fmt --all -- --check: passed
+  - cargo clippy --workspace --all-targets -- -D warnings: passed
+  - Cloudflare portable relay checks: 4/4 files (38 tests), identity 10,
+    replication 13, and pulse 4 passed
+  - sovereign handoff contract: passed
+  - context graph conformance: passed
+  - Rust workspace test lanes: passed, including buzz-auth 45, buzz-core 238,
+    buzz-cli 291, buzz-local-relay 34, and all additional binary/integration suites
+  - cargo-deny advisories, bans, licenses, and sources: passed
+
+Security gate note:
+  The first run found three newly published advisories against the existing
+  nostr 0.44.6 lock entry. The compatible 0.44.7 security release was selected,
+  then the complete gate was rerun and passed.

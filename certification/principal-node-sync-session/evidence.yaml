@@ -1,0 +1,61 @@
+capability: specs/capabilities/principal-node-sync-session.capability.yaml
+certified_at: 2026-08-05T04:40:41Z
+certified_by: Codex root reviewer
+certification_scope: issue-8-application-slice-and-journey-step-6
+
+evidence:
+  unit_tests:
+    report: reports/focused-tests.txt
+    passed: 0
+    failed: 0
+    skipped: 0
+    description: >-
+      No separate unit-only suite is claimed. Domain lifecycle behavior is
+      exercised through typed contract fixtures and application-boundary tests.
+
+  contract_tests:
+    report: reports/contract-tests.txt
+    passed: 9
+    failed: 0
+    skipped: 0
+    description: >-
+      Typed fixture deserialization, all 13 valid and 12 invalid lifecycle
+      transitions, trigger authority exclusion, cursor progress, receipt safety,
+      and compiler-distinct identifier contracts.
+
+  e2e_tests:
+    report: reports/application-e2e.txt
+    passed: 17
+    failed: 0
+    skipped: 0
+    journey_steps_covered: [6]
+    journey_steps_total: 1
+    description: >-
+      Technology-neutral end-to-end execution of the declared application slice
+      through mock implementations of every inward-owned port. No deployed host,
+      scheduler, network, or storage adapter is claimed.
+
+  repository_gate:
+    report: reports/just-ci.txt
+    status: passed
+    failed: 0
+
+traceability:
+  stories_with_features: 1/1
+  features_with_contracts: 1/1
+  endpoints_with_tests: 3/3
+  journeys_with_e2e: 1/1
+  orphan_tests: 0
+  orphan_features: 0
+  orphan_endpoints: 0
+
+gaps:
+  - >-
+    Runtime Instance replacement, restart, and resurrection behavior is outside
+    this application slice and remains deferred to issues #10 and #13.
+  - >-
+    Concrete storage, transport, scheduling, OS supervision, and deployment
+    adapters are outside this certification boundary.
+  - >-
+    No coverage percentage was collected; coverage is informational rather than
+    a certification gate.

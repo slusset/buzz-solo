@@ -1,0 +1,59 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-triggers-v0.1",
+    "type": "fixture",
+    "description": "All timing triggers normalize into the same authority-free application request.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Route every trigger through one procedure",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "base_request": {
+    "principal_node_id": "principal-node:home",
+    "direction": "pull",
+    "source_stream_id": "shared/clinical-review-v1"
+  },
+  "cases": [
+    {
+      "trigger": "startup",
+      "previous_session_id": null
+    },
+    {
+      "trigger": "journal_commit",
+      "previous_session_id": null
+    },
+    {
+      "trigger": "peer_wake",
+      "previous_session_id": null
+    },
+    {
+      "trigger": "recovery_tick",
+      "previous_session_id": null
+    },
+    {
+      "trigger": "operator_request",
+      "previous_session_id": null
+    },
+    {
+      "trigger": "retry",
+      "previous_session_id": "sync-session:failed-001"
+    }
+  ],
+  "expected": {
+    "operation": "request_sync",
+    "initial_state": "requested",
+    "first_transition": "begin_evaluation",
+    "next_state": "evaluating",
+    "shared_lifecycle": "node-sync-session-lifecycle",
+    "trusted_trigger_fields": [],
+    "forbidden_trigger_fields": [
+      "agreement",
+      "agreement_snapshot",
+      "selection",
+      "transport_principal",
+      "cursor",
+      "cursor_before",
+      "cursor_after"
+    ]
+  }
+}

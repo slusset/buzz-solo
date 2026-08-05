@@ -1,0 +1,61 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-invalid-transitions-v0.1",
+    "type": "fixture",
+    "description": "Every declared invalid SyncSession transition plus unsafe cancellation states.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Reject every declared invalid lifecycle transition",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "cases": [
+    {
+      "transition": "wake_directly_to_transfer",
+      "reason": "evaluation_required"
+    },
+    {
+      "transition": "host_commit_cursor",
+      "reason": "principal_node_owns_cursor_commit"
+    },
+    {
+      "transition": "rejected_receipt_to_cursor_commit",
+      "reason": "receipt_not_checkpoint_safe"
+    },
+    {
+      "transition": "cross_source_cursor_reuse",
+      "reason": "cursor_source_mismatch"
+    },
+    {
+      "transition": "transfer_rewritten_event",
+      "reason": "exact_envelope_required"
+    },
+    {
+      "transition": "retry_from_host_scheduler_history",
+      "reason": "principal_node_evidence_required"
+    },
+    {
+      "transition": "mutate_terminal_attempt_for_retry",
+      "reason": "terminal_session_immutable"
+    },
+    {
+      "transition": "expose_terminal_without_durable_summary",
+      "reason": "durable_terminal_summary_required"
+    },
+    {
+      "transition": "commit_cursor_without_completed_summary",
+      "reason": "atomic_continuity_commit_required"
+    },
+    {
+      "transition": "cancel_from_transferring",
+      "reason": "unsafe_cancellation_boundary"
+    },
+    {
+      "transition": "cancel_from_awaiting_durable_receipts",
+      "reason": "unsafe_cancellation_boundary"
+    },
+    {
+      "transition": "cancel_from_committing_cursor",
+      "reason": "unsafe_cancellation_boundary"
+    }
+  ]
+}

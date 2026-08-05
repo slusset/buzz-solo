@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/buzz-core",
+    "crates/buzz-principal-node",
     "crates/buzz-auth",
     "crates/buzz-acp",
     "crates/buzz-agent",

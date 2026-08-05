@@ -1,0 +1,71 @@
+capability:
+  id: principal-node-sync-session
+  type: capability
+  status: specified
+  description: |
+    Run startup, journal-commit, peer-wake, recovery, operator, and retry
+    synchronization through one PrincipalNode-owned lifecycle while preserving
+    exact event envelopes, source-bound opaque cursors, durable terminal facts,
+    and the deterministic portable relay core boundary.
+  scope:
+    personas:
+      - ../personas/domain-architect.md
+    journeys:
+      - ../journeys/evolve-a-principal-node.md
+    journey_steps:
+      - journey: ../journeys/evolve-a-principal-node.md
+        steps: [6]
+    stories:
+      - ../stories/principal-node/place-synchronization-inside-principal-node.md
+    story_slice:
+      story: ../stories/principal-node/place-synchronization-inside-principal-node.md
+      includes:
+        - one trigger-neutral synchronization lifecycle
+        - current authority, declaration, and authenticated transport evaluation
+        - exact-envelope transfer and checkpoint-safe cursor commitment
+        - immutable terminal facts, retry lineage, and safe-boundary cancellation
+      deferred:
+        - Runtime Instance replacement and restart integration
+        - concrete storage, transport, scheduling, and OS adapters
+    architecture:
+      - ../architecture/principal-node-boundary-v0.1.md
+      - ../architecture/portable-relay-boundary.md
+    models:
+      - ../models/principal-node/sync-session.model.yaml
+      - ../models/principal-node/sync-session.lifecycle.yaml
+      - ../models/shared/replication-cursor.model.yaml
+    features:
+      - ../features/principal-node/sync-session.feature
+    contracts:
+      - ../contracts/principal-node/sync-session-ports.yaml
+    fixtures:
+      - ../fixtures/principal-node/sync-session-triggers-v0.1.json
+      - ../fixtures/principal-node/sync-session-success-v0.1.json
+      - ../fixtures/principal-node/sync-session-empty-batch-v0.1.json
+      - ../fixtures/principal-node/sync-session-scan-progress-v0.1.json
+      - ../fixtures/principal-node/sync-session-receipts-v0.1.json
+      - ../fixtures/principal-node/sync-session-evaluation-failures-v0.1.json
+      - ../fixtures/principal-node/sync-session-pending-continuity-v0.1.json
+      - ../fixtures/principal-node/sync-session-valid-transitions-v0.1.json
+      - ../fixtures/principal-node/sync-session-invalid-transitions-v0.1.json
+  boundary:
+    parent: ./principal-node-boundary.capability.yaml
+    portable_core: ./portable-relay.capability.yaml
+    contract_kind: application-ports
+    new_network_endpoint: false
+  implementation:
+    issue: https://github.com/slusset/buzz-solo/issues/8
+    status: implemented
+    crate: crates/buzz-principal-node
+    sources:
+      - crates/buzz-principal-node/src/types.rs
+      - crates/buzz-principal-node/src/lifecycle.rs
+      - crates/buzz-principal-node/src/ports.rs
+      - crates/buzz-principal-node/src/service.rs
+    tests:
+      - crates/buzz-principal-node/tests/contract_fixtures.rs
+      - crates/buzz-principal-node/tests/sync_service.rs
+  certification:
+    status: certified
+    claim: issue-8-application-slice
+    evidence: ../../certification/principal-node-sync-session/evidence.yaml

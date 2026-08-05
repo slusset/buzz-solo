@@ -38,7 +38,7 @@ states:
     description: Current agreement, authorization, or required capability does not permit transfer.
     terminal: true
   failed:
-    description: A retryable transport, storage, or ambiguous receipt failure prevented safe completion.
+    description: A retryable evaluation, transfer, receipt, or definitive continuity failure prevented safe completion.
     terminal: true
   cancelled:
     description: Quiescence or explicit operator action stopped the session at a checkpoint-safe boundary.
@@ -56,6 +56,7 @@ transitions:
     guards:
       - agreement-and-transport-ready
       - source-reports-no-new-records
+      - completed-no-work-summary-is-durable
   begin_transfer:
     from: evaluating
     to: transferring
@@ -64,12 +65,30 @@ transitions:
       - current-agreement-matched
       - transport-ready
       - cursor-belongs-to-source-stream
+  begin_cursor_commit:
+    from: evaluating
+    to: committing_cursor
+    trigger: principal_node
+    guards:
+      - source-page-is-empty
+      - source-classifies-next-cursor-as-advanced
+      - source-stream-predicate-is-immutable
+      - no-receipt-evidence-is-manufactured
   refuse_transfer:
     from: evaluating
     to: blocked
     trigger: principal_node
     guards:
       - agreement-or-authorization-or-capability-not-ready
+      - blocked-summary-is-durable
+  evaluation_failure:
+    from: evaluating
+    to: failed
+    trigger: principal_node
+    guards:
+      - cursor-load-or-transport-or-projection-or-source-evaluation-failed
+      - granular-failed-summary-is-durable
+      - cursor-was-not-mutated
   batch_delivered:
     from: transferring
     to: awaiting_durable_receipts
@@ -78,6 +97,8 @@ transitions:
     from: transferring
     to: failed
     trigger: transport_adapter
+    guards:
+      - failed-summary-is-durable
   receipts_checkpoint_safe:
     from: awaiting_durable_receipts
     to: committing_cursor
@@ -90,18 +111,26 @@ transitions:
     trigger: principal_node
     guards:
       - at-least-one-record-is-rejected-or-ambiguous
+      - failed-summary-is-durable
   cursor_durable:
     from: committing_cursor
     to: completed
-    trigger: cursor_store
+    trigger: principal_node_continuity
+    guards:
+      - cursor-and-completed-summary-committed-atomically
   cursor_write_failed:
     from: committing_cursor
     to: failed
-    trigger: cursor_store
+    trigger: principal_node_continuity
+    guards:
+      - cursor-was-not-committed
+      - failed-summary-is-durable
   cancel_at_safe_boundary:
     from: [requested, evaluating]
     to: cancelled
     trigger: principal_node_quiescence
+    guards:
+      - cancelled-summary-is-durable
 
 invalid:
   - transition: wake_directly_to_transfer
@@ -118,3 +147,25 @@ invalid:
     reason: Retry derives from PrincipalNode-owned session evidence, not host job or RuntimeInstance history.
   - transition: mutate_terminal_attempt_for_retry
     reason: A retry creates a new session referencing the failed or blocked attempt; history remains immutable.
+  - transition: expose_terminal_without_durable_summary
+    reason: Terminal lifecycle states are committed facts and cannot be observed before their immutable summaries are durable.
+  - transition: commit_cursor_without_completed_summary
+    reason: Cursor advancement and its completed terminal summary must commit atomically through PrincipalNode continuity.
+  - transition: cancel_from_transferring
+    reason: A transferring batch is not a checkpoint-safe cancellation boundary.
+  - transition: cancel_from_awaiting_durable_receipts
+    reason: Receipts must be classified before the session can reach a terminal fact.
+  - transition: cancel_from_committing_cursor
+    reason: The atomic continuity commit must resolve before the session can reach a terminal fact.
+
+persistence:
+  semantics: Lifecycle transitions describe committed facts, not in-memory intent.
+  rules:
+    - a continuity adapter failure leaves the previous lifecycle state unchanged
+    - continuity persistence is retried for the same SyncSession and does not create a retry SyncSession
+    - a retry SyncSession is created only for an immutable failed or blocked attempt
+    - cursor advancement and completed terminal summary persistence are one atomic compare-and-commit
+    - continuity unavailability or an ambiguous commit response returns the exact immutable candidate as pending continuity
+    - pending continuity retries use the same SyncSession ID and never enter the retry trigger lifecycle
+    - an exact repeated terminal commit returns already stored same or commits it
+    - conflicting continuity content for a session ID fails closed

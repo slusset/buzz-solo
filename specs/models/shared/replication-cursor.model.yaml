@@ -5,7 +5,9 @@ aggregate: PrincipalNode
 description: |
   An opaque checkpoint position issued by one replication source stream and
   persisted by the PrincipalNode only after checkpoint-safe destination
-  outcomes. It is neither a sequence number nor a host scheduler bookmark.
+  outcomes, or after source-classified zero-record scan progress under that
+  immutable stream identity's predicate. It is neither a sequence number nor
+  a host scheduler bookmark.
 
 sources:
   stories:
@@ -48,6 +50,7 @@ commands:
     preconditions:
       - every receipt belongs to the same source stream
       - every covered outcome is checkpoint-safe
+      - when receipts are empty, the source page has no selected records and the source classifies the exact next cursor as advanced under an immutable SourceStreamId predicate
       - the cursor token is preserved exactly
 
 rules:
@@ -65,7 +68,7 @@ invariants:
   - id: cursor-is-source-bound
     description: A cursor is never supplied to a source stream other than source_stream_id.
   - id: cursor-does-not-advance-over-unsafe-outcome
-    description: Rejected, ambiguous, or non-durable outcomes cannot be covered without a separate durable skip decision.
+    description: Rejected, ambiguous, or non-durable selected-record outcomes cannot be covered without a separate durable skip decision; excluded scan progress is not a selected-record outcome.
   - id: cursor-is-not-parsed-by-destination
     description: The destination and host never parse, increment, compare, rename semantically, or synthesize opaque_token.
   - id: cursor-survives-runtime-instance-replacement
