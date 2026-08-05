@@ -1,0 +1,32 @@
+Principal Node SyncSession application-boundary journey evidence
+Certified at: 2026-08-05T04:40:41Z
+
+Intent:
+  Journey: specs/journeys/evolve-a-principal-node.md
+  Covered step: 6, Model one Principal-Node procedure
+  Story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+  Feature: specs/features/principal-node/sync-session.feature
+  Contract: specs/contracts/principal-node/sync-session-ports.yaml
+
+Command:
+  . ./bin/activate-hermit && cargo test -p buzz-principal-node --test sync_service
+
+Result:
+  PASS: 17 passed, 0 failed, 0 skipped
+
+Verified through every inward-owned port:
+  - pull and push use the same exact-envelope procedure
+  - every declared trigger enters request_sync, including typed retry lineage
+  - loaded retry-lineage summaries are revalidated before identity issuance or evaluation
+  - current transport, authorization, declaration, selection, and cursor evidence
+    is evaluated for each attempt
+  - completed cursor and summary commits are atomic and exact-acknowledged
+  - caught-up, scan-progress, blocked, failed, and cancelled terminal facts are durable
+  - rejected, ambiguous, transport-failed, stale, and malformed paths fail closed
+  - unavailable commits preserve an immutable exact retry candidate
+  - pending retry reuses the same session and exact candidate idempotently
+
+Boundary note:
+  This is end-to-end evidence for the technology-neutral application slice only.
+  It does not claim deployed Runtime Instance, host, network, scheduler, or storage
+  adapter coverage.

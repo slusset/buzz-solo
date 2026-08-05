@@ -85,11 +85,13 @@ This is the current physical crate map. The proposed logical dependency
 direction is PrincipalDomain and portable event kernel ← PrincipalNode
 application services ← NodeRuntimeInstance composition root, with relay,
 transport, storage, host, release, and interface adapters depending inward.
-The exact crate split is intentionally deferred until behavior contracts are
-reviewed.
+`buzz-principal-node` is the first technology-neutral application slice; the
+remaining Runtime Instance composition and adapter split stays deferred until
+its behavior contracts are reviewed.
 
-**Solo center** — `buzz-local-relay` (relay + replication/handoff/pulse
-bins) · `buzz-cli`
+**Solo center** — `buzz-principal-node` (Principal-Node-owned synchronization
+procedure and inward ports) · `buzz-local-relay` (relay +
+replication/handoff/pulse bins) · `buzz-cli`
 
 **Shared protocol** — `buzz-core` (zero-I/O types, NIP-01 filters, Schnorr
 verify, kind registry) · `buzz-auth` (NIP-42/98 verification) · `buzz-sdk`

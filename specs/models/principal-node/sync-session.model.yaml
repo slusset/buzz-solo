@@ -84,12 +84,27 @@ value_objects:
     representation: [stored, duplicate, superseded, rejected, ambiguous]
   - name: SyncOutcome
     representation: [classification, records_examined, cursor_committed, evidence_refs]
+  - name: EvaluationFailureClassification
+    representation: [cursor_load_failed, transport_unavailable, projection_unavailable, source_unavailable, malformed_source_batch]
+    purpose: Distinguish operational failures that prevent evaluation from safely beginning transfer.
+  - name: SourcePageProgress
+    representation: [unchanged, advanced]
+    purpose: Source-issued equality classification for one bounded page, including an agreed initial no-position equivalent without interpreting cursor syntax.
+  - name: TerminalSyncSessionSummary
+    representation: [session_id, terminal_state, outcome, cursor_before, cursor_after, receipt_summary, started_at, finished_at, evidence_refs]
+    purpose: Immutable continuity evidence committed before a terminal lifecycle state is exposed.
+  - name: PendingContinuityCommit
+    representation: [session_id, prior_lifecycle_state, exact_candidate_commit]
+    purpose: Immutable same-session work retained when continuity persistence is unavailable or its result is ambiguous.
 
 commands:
   - name: RequestSync
     actor: principal_node_trigger
     input: [trigger, direction, source_stream_id]
     output: requested_sync_session
+    preconditions:
+      - request validation succeeds before a lifecycle is exposed
+      - an infallible session ID issuer and attempt clock are available as application prerequisites
   - name: EvaluateCurrentAgreement
     actor: principal_node
     input: [current_declaration_heads, authenticated_transport_evidence]
@@ -104,8 +119,21 @@ commands:
     output: checkpoint_safe_or_retryable_classification
   - name: CommitCursor
     actor: principal_node
-    input: [source_bound_cursor, checkpoint_safe_receipts]
-    output: durable_cursor_after
+    input: [expected_source_bound_cursor, candidate_source_bound_cursor, checkpoint_safe_receipts, completed_terminal_summary]
+    output: atomic_durable_cursor_and_completed_summary
+    preconditions:
+      - every selected returned record has a durable checkpoint-safe receipt
+      - zero-receipt cursor advancement covers only excluded records under the immutable SourceStreamId predicate
+      - the completed summary reports the exact candidate cursor
+      - cursor and completed summary commit atomically through PrincipalNode continuity
+  - name: CommitTerminalSummary
+    actor: principal_node
+    input: [terminal_summary_without_cursor_advance]
+    output: durable_terminal_summary
+    preconditions:
+      - the summary identifies one completed, blocked, failed, or cancelled outcome
+      - a completed no-work summary reports no cursor mutation
+      - the first durable summary for a session ID is immutable
   - name: RetrySync
     actor: principal_node
     input: [failed_or_blocked_session, current_declarations]
@@ -113,6 +141,14 @@ commands:
     preconditions:
       - the prior session remains unchanged
       - the new session references the prior session ID
+  - name: RetryPendingContinuity
+    actor: principal_node
+    input: [pending_continuity_commit]
+    output: durable_terminal_fact_or_same_pending_commit
+    preconditions:
+      - the exact session ID and candidate commit remain unchanged
+      - no new SyncSession ID is issued
+      - conflicting content for the same session ID fails closed
 
 rules:
   - id: trigger-is-not-authority
@@ -127,6 +163,24 @@ rules:
   - id: receipt-classification-is-fail-closed
     description: Rejected or ambiguous outcomes prevent cursor commitment unless a separate durable skip decision exists.
     enforced: domain
+  - id: terminal-state-is-a-durable-fact
+    description: A terminal lifecycle state is exposed only after its immutable terminal summary is durable; continuity adapter failure leaves the previous lifecycle state unchanged for persistence retry of the same session.
+    enforced: application
+  - id: cursor-and-completion-are-atomic
+    description: A cursor-advancing completion atomically compares the expected cursor and commits the candidate cursor with its completed terminal summary through one PrincipalNode continuity port.
+    enforced: application
+  - id: zero-record-scan-progress-is-source-classified
+    description: An empty page advances a cursor only when the source classifies next_cursor as advanced relative to cursor_before under the immutable SourceStreamId predicate.
+    enforced: domain
+  - id: stream-predicate-change-requires-new-identity
+    description: Redefining the selection predicate requires a new SourceStreamId and fresh cursor lineage, so excluded source records need no destination receipts.
+    enforced: authorization
+  - id: evaluation-failure-is-granular
+    description: Cursor-load, transport-unavailable, projection-unavailable, source-unavailable, and malformed-source-batch failures persist distinguishable evidence before failed is exposed.
+    enforced: application
+  - id: pending-continuity-is-same-session
+    description: An unavailable or ambiguous continuity result retains the exact candidate commit for idempotent persistence retry without creating a retry SyncSession.
+    enforced: application
 
 invariants:
   - id: all-triggers-share-lifecycle
@@ -134,13 +188,19 @@ invariants:
   - id: event-envelope-remains-exact
     description: Event ID, author, kind, tags, content, and signature remain unchanged in transit.
   - id: cursor-never-leads-durable-outcomes
-    description: The durable cursor cannot cover a record without a checkpoint-safe destination receipt.
+    description: The durable cursor cannot cover a selected returned record without a checkpoint-safe destination receipt; source-classified excluded records may advance only under an immutable stream predicate.
   - id: scheduler-history-is-irrelevant
     description: Restart and retry derive from PrincipalNode-owned state, never a host scheduler's run history or a RuntimeInstance's memory.
   - id: runtime-instance-replacement-does-not-fork-policy
     description: Replacing the executing RuntimeInstance preserves the PrincipalNode's agreement, cursor, retry, and checkpoint rules.
   - id: zero-record-sync-is-success
-    description: A valid evaluation with no new records completes as caught up without manufacturing a cursor transition.
+    description: A valid empty page completes as caught up without cursor mutation when progress is unchanged, or atomically commits source-classified scan progress without manufacturing receipts when progress advanced.
+  - id: terminal-summary-never-lags-terminal-state
+    description: Completed, blocked, failed, and cancelled states always have durable immutable terminal summaries before callers can observe those states.
+  - id: cursor-never-leads-completion-evidence
+    description: A newly committed cursor and its completed terminal summary become durable atomically, so neither can be observed without the other.
+  - id: pending-continuity-candidate-is-immutable
+    description: Retrying continuity uses the exact prior state, session ID, cursor expectation, receipts, and terminal summary; conflicting content is rejected.
 
 boundaries:
   inside:
@@ -148,7 +208,9 @@ boundaries:
     - current agreement and transport evaluation
     - batch orchestration and receipt classification
     - retry classification
-    - durable source-bound cursor commitment
+    - atomic durable source-bound cursor and completion-summary commitment
+    - durable terminal-summary commitment without cursor mutation
+    - same-session idempotent retry of an immutable pending continuity commit
   outside:
     - event verification and sink ingest semantics
     - transport socket implementation

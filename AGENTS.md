@@ -33,6 +33,7 @@ from git history if a surface returns.
 ```
 crates/
   # Solo center
+  buzz-principal-node  # Technology-neutral Principal Node application services
   buzz-local-relay    # Durable single-process relay — verified events, NDJSON log
   buzz-cli            # Agent-first node CLI — context, journal, handoffs, sync
   # Shared protocol + client plumbing

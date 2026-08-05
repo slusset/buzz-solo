@@ -1,0 +1,19 @@
+Principal Node SyncSession contract evidence
+Certified at: 2026-08-05T04:40:41Z
+
+Command:
+  . ./bin/activate-hermit && cargo test -p buzz-principal-node --test contract_fixtures
+
+Result:
+  PASS: 9 passed, 0 failed, 0 skipped
+
+Verified:
+  - all nine declared JSON fixtures deserialize into typed contract values
+  - all 13 declared valid lifecycle transitions execute
+  - all 12 declared invalid lifecycle transitions fail with stable reasons
+  - cancellation is refused from checkpoint-unsafe states
+  - all six triggers deserialize only authority-free requests
+  - empty and filtered-scan pages preserve exact cursor progress semantics
+  - empty opaque cursor tokens fail before continuity mutation
+  - receipts bind exact source, cursor, event ID, durability, and outcome
+  - principal, source stream, session, cursor, and event identifiers remain distinct

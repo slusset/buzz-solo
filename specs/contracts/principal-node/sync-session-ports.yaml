@@ -1,0 +1,703 @@
+id: principal-node-sync-session-ports
+type: application-port-contract
+version: 0.1.0
+status: proposed
+boundary: principal-node-application
+description: |
+  Technology-neutral inward-owned ports for one bounded PrincipalNode
+  synchronization attempt. This contract composes the portable relay's
+  replication source and sink primitives; it does not define a new HTTP,
+  WebSocket, process, or host-scheduler surface.
+
+traceability:
+  issue: https://github.com/slusset/buzz-solo/issues/8
+  persona: specs/personas/domain-architect.md
+  x-journey: specs/journeys/evolve-a-principal-node.md
+  x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+  x-feature: specs/features/principal-node/sync-session.feature
+  models:
+    - specs/models/principal-node/sync-session.model.yaml
+    - specs/models/principal-node/sync-session.lifecycle.yaml
+    - specs/models/shared/replication-cursor.model.yaml
+  architecture:
+    - specs/architecture/principal-node-boundary-v0.1.md
+    - specs/architecture/portable-relay-boundary.md
+
+scope:
+  owns:
+    - trigger normalization
+    - per-attempt current authority and agreement evaluation
+    - push and pull orchestration through the same procedure
+    - exact-envelope transfer orchestration
+    - checkpoint-safe receipt classification
+    - atomic source-bound cursor and completed-summary compare-and-commit authorization
+    - durable immutable terminal session summaries before terminal-state exposure
+    - typed same-session pending continuity and idempotent exact-candidate retry
+    - retry lineage
+    - safe-boundary cancellation
+  excludes:
+    - declaration authorship
+    - event verification and destination ingest policy
+    - transport socket implementation
+    - source cursor encoding or ordering
+    - filesystem placement
+    - OS supervision and process spawning
+    - scheduling and retry cadence
+    - skip or dead-letter authorization
+    - agent identity
+
+application_prerequisites:
+  required:
+    - infallible SyncSessionIdentityIssuer
+    - infallible AttemptClock
+  construction_rule: Missing prerequisites fail composition before any SyncSession identity or lifecycle state is exposed.
+
+type_system:
+  compiler_distinct:
+    PrincipalNodeId:
+      kind: newtype
+      representation: string
+      constraints: [non-empty]
+    SourceStreamId:
+      kind: newtype
+      representation: string
+      constraints: [non-empty]
+    SyncSessionId:
+      kind: newtype
+      representation: string
+      constraints: [non-empty]
+    SyncDirection:
+      kind: enum
+      values: [pull, push]
+    SyncTrigger:
+      kind: enum
+      values:
+        - startup
+        - journal_commit
+        - peer_wake
+        - recovery_tick
+        - operator_request
+        - retry
+    OpaqueSourceCursorToken:
+      kind: newtype
+      representation: bytes_or_string
+      permitted_operations: [preserve, equality]
+      forbidden_operations: [parse, increment, order, synthesize, rename_semantically]
+    TransportPrincipal:
+      kind: newtype
+      representation: string
+      constraints: [non-empty]
+    EventId:
+      kind: newtype
+      representation: hex_string
+      constraints: [length_64]
+
+schemas:
+  SyncRequest:
+    additional_fields: forbidden
+    required:
+      principal_node_id: PrincipalNodeId
+      direction: SyncDirection
+      source_stream_id: SourceStreamId
+      trigger: SyncTrigger
+    optional:
+      previous_session_id: SyncSessionId
+    forbidden_authority_fields:
+      - agreement
+      - agreement_snapshot
+      - selection
+      - transport_principal
+      - cursor
+      - cursor_before
+      - cursor_after
+    constraints:
+      - trigger retry requires previous_session_id
+      - every non-retry trigger forbids previous_session_id
+      - previous_session_id must resolve to an immutable failed or blocked session
+
+  SourceBoundCursor:
+    required:
+      source_stream_id: SourceStreamId
+      opaque_token: OpaqueSourceCursorToken
+    equality: both fields must be equal
+    invariants:
+      - the token is returned only to the source stream that issued it
+      - the Principal Node and adapters do not interpret token contents
+
+  SignedEventEnvelope:
+    required:
+      id: EventId
+      pubkey: hex_string_64
+      created_at: integer
+      kind: integer
+      tags: list_of_string_lists
+      content: string
+      sig: hex_string_128
+    transfer_rule: all fields and bytes cross the replication boundary unchanged
+
+  ReplicationRecord:
+    required:
+      source: SourceStreamId
+      cursor: OpaqueSourceCursorToken
+      event: SignedEventEnvelope
+
+  ReplicationBatch:
+    required:
+      records: list<ReplicationRecord>
+      next_cursor: OpaqueSourceCursorToken
+      caught_up: boolean
+    constraints:
+      - every record source equals the requested SourceStreamId
+      - records are bounded and in source journal order
+      - next_cursor is required and preserves the exact source-issued token
+      - next_cursor is immediately after the final returned record or the requested position when the batch is empty
+
+  SourceCursorProgress:
+    kind: enum
+    values: [unchanged, advanced]
+    constraints:
+      - the source owns classification relative to cursor_before
+      - classification compares identity or agreed initial no-position equivalence only
+      - the Principal Node does not parse, order, increment, or synthesize a token
+
+  SourcePage:
+    required:
+      batch: ReplicationBatch
+      cursor_progress: SourceCursorProgress
+    constraints:
+      - one SyncSession reads exactly one bounded SourcePage
+      - advanced preserves the exact batch next_cursor as the candidate
+      - a non-empty page with unchanged progress is malformed_source_batch
+      - unchanged with an empty non-caught-up batch is malformed_source_batch
+      - empty advanced pages contain only records excluded by the immutable SourceStreamId predicate
+
+  ReceiptOutcome:
+    kind: enum
+    values: [stored, duplicate, superseded, rejected, ambiguous]
+    checkpoint_safe: [stored, duplicate, superseded]
+    checkpoint_unsafe: [rejected, ambiguous]
+
+  ReceiptEvidence:
+    required:
+      source: SourceStreamId
+      cursor: OpaqueSourceCursorToken
+      event_id: EventId
+      outcome: ReceiptOutcome
+      durable: boolean
+      receipt_digest: string
+    constraints:
+      - the receipt is checkpoint-safe only when durable is true and outcome is checkpoint-safe
+      - the receipt must bind the exact record source, cursor, and event ID
+
+  ReceiptSummary:
+    required:
+      stored: non_negative_integer
+      duplicate: non_negative_integer
+      superseded: non_negative_integer
+      rejected: non_negative_integer
+      ambiguous: non_negative_integer
+
+  ClockSample:
+    required:
+      wall_time: timestamp
+      monotonic_tick: non_negative_integer
+    constraints:
+      - monotonic_tick is compared only with samples from the same Clock port
+      - clock samples provide bounded evidence and never schedule work
+
+  AuthenticatedTransportEvidence:
+    required:
+      transport_principal: TransportPrincipal
+      source_stream_id: SourceStreamId
+      direction: SyncDirection
+      authenticated_at: ClockSample
+      evidence_ref: string
+    constraints:
+      - the transport adapter derives the principal from authenticated evidence
+      - a trigger or replication record cannot assert the trusted principal
+
+  CurrentSyncPlan:
+    required:
+      principal_node_id: PrincipalNodeId
+      source_stream_id: SourceStreamId
+      direction: SyncDirection
+      domain_authorization_ref: string
+      node_authorization_ref: string
+      agreement_snapshot_ref: string
+      export_head_ref: string
+      admit_head_ref: string
+      selection: projected_event_selection
+      transport_principal: TransportPrincipal
+      transport_evidence_ref: string
+      evaluated_at: ClockSample
+      batch_limit: positive_integer
+    constraints:
+      - all evidence is current for this attempt
+      - selection comes only from the current declaration projection
+      - selection is immutable for source_stream_id and any change requires a new SourceStreamId with fresh cursor lineage
+      - transport principal matches authenticated transport evidence
+      - a prior attempt snapshot is evidence of history only
+
+  BlockedSyncPlan:
+    required:
+      principal_node_id: PrincipalNodeId
+      source_stream_id: SourceStreamId
+      direction: SyncDirection
+      evaluated_at: ClockSample
+      classification: BlockedClassification
+      evidence_refs: list<string>
+
+  BlockedClassification:
+    kind: enum
+    values:
+      - node_unauthorized
+      - agreement_not_ready
+      - transport_not_ready
+      - required_capability_missing
+
+  SyncOutcomeClassification:
+    kind: enum
+    values:
+      - caught_up
+      - scan_progress
+      - replicated
+      - node_unauthorized
+      - agreement_not_ready
+      - transport_not_ready
+      - required_capability_missing
+      - cursor_load_failed
+      - transport_unavailable
+      - projection_unavailable
+      - source_unavailable
+      - malformed_source_batch
+      - receipt_rejected
+      - receipt_ambiguous
+      - transport_failed
+      - cursor_commit_failed
+      - cancelled
+
+  TerminalSyncSessionSummary:
+    additional_fields: forbidden
+    required:
+      principal_node_id: PrincipalNodeId
+      session_id: SyncSessionId
+      direction: SyncDirection
+      source_stream_id: SourceStreamId
+      trigger: SyncTrigger
+      terminal_state: terminal_sync_state
+      started_at: ClockSample
+      finished_at: ClockSample
+      outcome: SyncOutcomeClassification
+      records_examined: non_negative_integer
+      cursor_committed: boolean
+      evidence_refs: list<string>
+    optional:
+      previous_session_id: SyncSessionId
+      agreement_snapshot_ref: string
+      cursor_before: SourceBoundCursor
+      cursor_after: SourceBoundCursor
+      receipt_summary: ReceiptSummary
+    constraints:
+      - terminal_state is one of completed, blocked, failed, or cancelled
+      - cursor_after is present only when cursor_committed is true
+      - cursor_after belongs to source_stream_id and preserves the source token exactly
+      - previous_session_id is present exactly when trigger is retry
+      - finished_at does not precede started_at under the Clock port
+      - the summary is immutable after its first durable persistence
+      - no terminal_state is exposed before this summary is durable
+      - a cursor-advancing completed summary becomes durable atomically with cursor_after
+
+  TerminalCommitCandidate:
+    required:
+      summary: TerminalSyncSessionSummary
+    constraints:
+      - summary reports completed no-work, blocked, failed, or cancelled
+      - summary reports cursor_committed false
+
+  CompletedCommitCandidate:
+    required:
+      expected: SourceBoundCursor | none
+      candidate: SourceBoundCursor
+      receipts: list<ReceiptEvidence>
+      summary: TerminalSyncSessionSummary
+    constraints:
+      - summary reports completed and cursor_committed true
+      - summary cursor_after equals candidate exactly
+      - every receipt is durable, checkpoint-safe, and bound to a selected returned record
+      - receipts may be empty only for an empty advanced SourcePage under the immutable SourceStreamId predicate
+
+  PendingContinuityCommit:
+    additional_fields: forbidden
+    required:
+      principal_node_id: PrincipalNodeId
+      session_id: SyncSessionId
+      prior_lifecycle_state: non_terminal_sync_state
+      candidate_kind: terminal_summary | completed_atomic
+      exact_candidate: TerminalCommitCandidate | CompletedCommitCandidate
+      candidate_digest: string
+    constraints:
+      - session_id equals exact_candidate summary session_id
+      - candidate_digest canonically binds every exact_candidate field
+      - pending content is immutable across retry
+      - retry never issues a new SyncSession ID
+
+  CompletedCommitResult:
+    required:
+      disposition: committed | already_committed_same
+      committed_cursor: SourceBoundCursor
+      committed_summary: TerminalSyncSessionSummary
+
+ports:
+  inbound:
+    PrincipalNodeSyncSession:
+      owner: principal_node_application
+      description: One trigger-neutral entry point for bounded synchronization attempts.
+      operations:
+        request_sync:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input: SyncRequest
+          output: TerminalSyncSessionSummary | PendingContinuityCommit
+          errors:
+            - invalid_request
+            - untrusted_trigger_authority
+            - prior_session_not_retryable
+            - application_prerequisite_unavailable
+          guarantees:
+            - every trigger enters the node-sync-session lifecycle
+            - current evidence is evaluated before transfer
+            - no successful terminal result is acknowledged before its summary is durable
+            - continuity unavailable or ambiguous returns exact same-session pending content
+        cancel_at_safe_boundary:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+            session_id: SyncSessionId
+            reason: principal_node_quiescence
+          output: TerminalSyncSessionSummary | PendingContinuityCommit
+          errors:
+            - session_not_active
+            - unsafe_cancellation_boundary
+          guarantees:
+            - cancellation succeeds only from requested or evaluating
+            - cancellation never abandons an unclassified record or partial cursor commit
+        retry_pending_continuity:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input: PendingContinuityCommit
+          output: TerminalSyncSessionSummary | PendingContinuityCommit
+          errors:
+            - conflicting_continuity_content
+          guarantees:
+            - the exact candidate is submitted without mutation
+            - stored and already_stored_same expose the candidate terminal summary
+            - committed and already_committed_same expose the atomic completed summary
+            - another unavailable or ambiguous result returns the same pending candidate
+            - no new SyncSession identity is issued
+
+  outbound:
+    SyncSessionIdentityIssuer:
+      owner: principal_node_application
+      purpose: Issue a fresh compiler-distinct identity for each attempt.
+      operations:
+        issue_session_id:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+          output: SyncSessionId
+          infallible: true
+          guarantee: an issued ID does not identify a prior session of this Principal Node
+
+    AttemptClock:
+      owner: principal_node_application
+      purpose: Bound attempt evidence without owning scheduling or wake delivery.
+      operations:
+        now:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input: none
+          output: ClockSample
+          infallible: true
+
+    AuthenticatedPeerTransport:
+      owner: principal_node_application
+      purpose: Obtain fresh peer-authentication evidence without trusting a trigger assertion.
+      operations:
+        authenticate_peer:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+            source_stream_id: SourceStreamId
+            direction: SyncDirection
+            observed_at: ClockSample
+          output: AuthenticatedTransportEvidence | transport_not_ready
+          errors: [transport_unavailable]
+          classifications:
+            transport_not_ready: blocked
+            transport_unavailable: evaluation_failure
+          boundary_rule: no HTTP, WebSocket, socket, URL, or client type crosses this port
+
+    CurrentSyncProjection:
+      owner: principal_node_application
+      purpose: Derive current node authority, agreement, selection, and capability readiness.
+      operations:
+        evaluate_current_plan:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+            source_stream_id: SourceStreamId
+            direction: SyncDirection
+            transport_evidence: AuthenticatedTransportEvidence | transport_not_ready
+            evaluated_at: ClockSample
+          output: CurrentSyncPlan | BlockedSyncPlan
+          errors: [projection_unavailable]
+          guarantees:
+            - current domain-root and Principal Node authorization are evaluated
+            - current export, admit, selection, and required capability evidence are evaluated
+            - prior snapshots are never accepted as current merely because a trigger supplies them
+
+    ReplicationSource:
+      owner: principal_node_application
+      conforms_to: specs/architecture/portable-relay-boundary.md#replication-source-and-sink
+      operations:
+        read_bounded_batch:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            source_stream_id: SourceStreamId
+            cursor_before: SourceBoundCursor | none
+            selection: projected_event_selection
+            batch_limit: positive_integer
+            transport_evidence: AuthenticatedTransportEvidence
+          output: SourcePage
+          errors: [source_unavailable, malformed_source_batch]
+          guarantees:
+            - the batch is one existing buzz_core replication page
+            - cursor_progress is source-classified without exposing token interpretation
+
+    ReplicationSink:
+      owner: principal_node_application
+      conforms_to: specs/architecture/portable-relay-boundary.md#replication-source-and-sink
+      operations:
+        ingest_exact:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            record: ReplicationRecord
+            current_plan: CurrentSyncPlan
+            transport_evidence: AuthenticatedTransportEvidence
+          output: ReceiptEvidence
+          errors: [sink_unavailable, transport_failed, receipt_ambiguous]
+          guarantees:
+            - the destination applies its normal verification and ingest policy
+            - the exact signed envelope is not rewritten by orchestration
+
+    PrincipalNodeSyncContinuity:
+      owner: principal_node_application
+      purpose: |
+        Persist source-bound cursors and immutable terminal session facts under
+        one Principal Node continuity boundary, including atomic cursor and
+        completed-summary compare-and-commit.
+      operations:
+        load_cursor:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+            source_stream_id: SourceStreamId
+            direction: SyncDirection
+          output: SourceBoundCursor | none
+          errors: [cursor_load_failed]
+        load_terminal:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+            session_id: SyncSessionId
+          output: TerminalSyncSessionSummary | none
+          errors: [continuity_unavailable]
+        persist_terminal:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input: TerminalSyncSessionSummary
+          output: stored | already_stored_same
+          errors:
+            - continuity_unavailable
+            - continuity_result_ambiguous
+            - conflicting_continuity_content
+          guarantees:
+            - this operation is used only when no cursor advances
+            - the first durable value for a session ID is immutable
+            - replaying the exact same summary is idempotent
+            - a different summary for the same session ID is rejected
+            - terminal state is exposed only after durable acknowledgement
+        commit_completed:
+          x-story: specs/stories/principal-node/place-synchronization-inside-principal-node.md
+          x-feature: specs/features/principal-node/sync-session.feature
+          x-journey: specs/journeys/evolve-a-principal-node.md
+          input:
+            principal_node_id: PrincipalNodeId
+            source_stream_id: SourceStreamId
+            direction: SyncDirection
+            expected: SourceBoundCursor | none
+            candidate: SourceBoundCursor
+            receipts: list<ReceiptEvidence>
+            summary: TerminalSyncSessionSummary
+          output: CompletedCommitResult
+          errors:
+            - cursor_compare_conflict
+            - continuity_unavailable
+            - continuity_result_ambiguous
+            - cursor_source_mismatch
+            - receipt_not_checkpoint_safe
+            - conflicting_continuity_content
+          guarantees:
+            - equality compares the source binding and opaque token without interpreting the token
+            - every receipt source and cursor matches a selected returned replication record
+            - candidate is preserved unchanged and committed when every selected returned record is checkpoint-safe or the page is empty source-classified scan progress
+            - summary is completed and its cursor_after equals candidate
+            - cursor and completed summary become durable atomically or neither does
+            - exact replay by session ID returns already_committed_same or commits the candidate
+            - conflicting cursor, receipt, or summary content for the session ID fails closed
+            - completed state is exposed only after durable atomic acknowledgement
+
+lifecycle:
+  source: specs/models/principal-node/sync-session.lifecycle.yaml
+  valid_transitions:
+    begin_evaluation:
+      from: requested
+      to: evaluating
+    no_work_needed:
+      from: evaluating
+      to: completed
+      guard: current plan ready, empty page is caught up with unchanged cursor progress, and completed no-work summary is durable
+    begin_transfer:
+      from: evaluating
+      to: transferring
+      guard: current plan ready and cursor source binding valid
+    begin_cursor_commit:
+      from: evaluating
+      to: committing_cursor
+      guard: empty page has source-classified cursor progress under the immutable stream predicate
+    refuse_transfer:
+      from: evaluating
+      to: blocked
+      guard: current evidence is not ready and the blocked summary is durable
+    evaluation_failure:
+      from: evaluating
+      to: failed
+      guard: granular evaluation-failure summary is durable without cursor mutation
+    batch_delivered:
+      from: transferring
+      to: awaiting_durable_receipts
+    transport_failure:
+      from: transferring
+      to: failed
+      guard: failed summary is durable without cursor mutation
+    receipts_checkpoint_safe:
+      from: awaiting_durable_receipts
+      to: committing_cursor
+      guard: every covered receipt is durable and checkpoint-safe
+    receipts_not_checkpoint_safe:
+      from: awaiting_durable_receipts
+      to: failed
+      guard: at least one receipt is unsafe and the failed summary is durable without cursor mutation
+    cursor_durable:
+      from: committing_cursor
+      to: completed
+      guard: candidate cursor and completed summary committed atomically
+    cursor_write_failed:
+      from: committing_cursor
+      to: failed
+      guard: cursor was not committed and the failed summary is durable
+    cancel_at_safe_boundary:
+      from: [requested, evaluating]
+      to: cancelled
+      guard: cancelled summary is durable
+  invalid_transitions:
+    wake_directly_to_transfer: evaluation_required
+    host_commit_cursor: principal_node_owns_cursor_commit
+    rejected_receipt_to_cursor_commit: receipt_not_checkpoint_safe
+    cross_source_cursor_reuse: cursor_source_mismatch
+    transfer_rewritten_event: exact_envelope_required
+    retry_from_host_scheduler_history: principal_node_evidence_required
+    mutate_terminal_attempt_for_retry: terminal_session_immutable
+    expose_terminal_without_durable_summary: durable_terminal_summary_required
+    commit_cursor_without_completed_summary: atomic_continuity_commit_required
+    cancel_from_transferring: unsafe_cancellation_boundary
+    cancel_from_awaiting_durable_receipts: unsafe_cancellation_boundary
+    cancel_from_committing_cursor: unsafe_cancellation_boundary
+
+procedure:
+  request_sync:
+    steps:
+      - validate SyncRequest and retry evidence and reject authority-bearing fields before exposing a lifecycle
+      - issue a fresh SyncSessionId and enter requested
+      - sample attempt start time
+      - enter evaluating
+      - load the exact durable cursor for source and direction
+      - authenticate the current peer and obtain transport evidence
+      - derive the current plan from domain authorization and declaration projection
+      - durably persist a granular failed summary before exposing evaluation_failure when cursor load, transport, projection, source read, or batch validation fails
+      - sample finish time and durably persist a blocked summary before exposing blocked when current evidence is not ready
+      - read exactly one bounded SourcePage through the direction-specific source adapter
+      - for an empty unchanged caught-up page, durably persist a caught_up summary without cursor mutation before exposing completed
+      - for an empty advanced page, atomically commit the exact next_cursor with a completed scan_progress or caught_up summary and zero receipts
+      - classify an empty unchanged non-caught-up page as malformed_source_batch to prevent livelock
+      - transfer every exact envelope through the direction-specific sink adapter
+      - classify every receipt evidence item for durability and outcome
+      - sample finish time and durably persist a failed summary without cursor mutation before exposing failed when a receipt is rejected, ambiguous, or not durable
+      - sample finish time and atomically compare-and-commit the exact batch next_cursor and completed summary after all receipts are checkpoint-safe
+      - if compare-and-commit is definitively rejected, durably persist a failed summary without cursor mutation before exposing failed
+      - expose a terminal state only after Principal Node continuity acknowledges its durable summary
+    push_pull_rule: direction changes adapter composition, never lifecycle or checkpoint policy
+    retry_rule: a retry issues a new session ID, references one failed or blocked summary, and repeats current evaluation
+    persistence_rule: continuity unavailable or ambiguous returns exact pending content and leaves the previous state unchanged
+    pending_retry_rule: retry_pending_continuity resubmits the immutable candidate idempotently without issuing a new session ID
+
+conformance:
+  behavioral:
+    feature: specs/features/principal-node/sync-session.feature
+    fixtures:
+      - specs/fixtures/principal-node/sync-session-triggers-v0.1.json
+      - specs/fixtures/principal-node/sync-session-success-v0.1.json
+      - specs/fixtures/principal-node/sync-session-empty-batch-v0.1.json
+      - specs/fixtures/principal-node/sync-session-scan-progress-v0.1.json
+      - specs/fixtures/principal-node/sync-session-receipts-v0.1.json
+      - specs/fixtures/principal-node/sync-session-evaluation-failures-v0.1.json
+      - specs/fixtures/principal-node/sync-session-pending-continuity-v0.1.json
+      - specs/fixtures/principal-node/sync-session-valid-transitions-v0.1.json
+      - specs/fixtures/principal-node/sync-session-invalid-transitions-v0.1.json
+  static:
+    application_domain_forbidden:
+      - launchd APIs or labels
+      - filesystem paths or placement policy
+      - HTTP client types
+      - WebSocket client types
+      - process spawn APIs
+    portable_core_forbidden:
+      - scheduling
+      - retry cadence
+      - host lifecycle
+      - network orchestration
+    rust_quality:
+      - public API has documentation comments
+      - production paths introduce no unwrap()
+      - production paths introduce no expect()
+      - no unsafe code

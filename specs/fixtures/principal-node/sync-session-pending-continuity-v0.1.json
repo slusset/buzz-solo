@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-pending-continuity-v0.1",
+    "type": "fixture",
+    "description": "Exact same-session candidates for idempotent terminal and atomic-completion persistence retry.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Retry the exact pending continuity commit idempotently",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "cases": [
+    {
+      "candidate_kind": "terminal_summary",
+      "principal_node_id": "principal-node:home",
+      "session_id": "sync-session:blocked-004",
+      "prior_lifecycle_state": "evaluating",
+      "candidate_digest": "sha256:c165c7d6822f2f4e471ddff4bdd177fd4dcec27ea22077204b9415f555246996",
+      "exact_candidate": {
+        "summary": {
+          "principal_node_id": "principal-node:home",
+          "session_id": "sync-session:blocked-004",
+          "direction": "pull",
+          "source_stream_id": "shared/clinical-review-v1",
+          "trigger": "recovery_tick",
+          "terminal_state": "blocked",
+          "started_at": {
+            "wall_time": "2026-08-04T15:00:00Z",
+            "monotonic_tick": 13000
+          },
+          "finished_at": {
+            "wall_time": "2026-08-04T15:00:01Z",
+            "monotonic_tick": 13001
+          },
+          "outcome": "transport_not_ready",
+          "records_examined": 0,
+          "cursor_committed": false,
+          "evidence_refs": [
+            "transport-not-ready:001"
+          ]
+        }
+      },
+      "accepted_dispositions": [
+        "stored",
+        "already_stored_same"
+      ]
+    },
+    {
+      "candidate_kind": "completed_atomic",
+      "principal_node_id": "principal-node:home",
+      "session_id": "sync-session:completed-005",
+      "prior_lifecycle_state": "committing_cursor",
+      "candidate_digest": "sha256:15243f20329864e6df2af9240b46a8a3cae87920b0bb71defd175b6526a0d5ea",
+      "exact_candidate": {
+        "expected": {
+          "source_stream_id": "shared/clinical-review-v1",
+          "opaque_token": "opaque:batch-001"
+        },
+        "candidate": {
+          "source_stream_id": "shared/clinical-review-v1",
+          "opaque_token": "opaque:batch-002"
+        },
+        "receipts": [
+          {
+            "source": "shared/clinical-review-v1",
+            "cursor": "opaque:batch-002",
+            "event_id": "d892a65e7677e0554ebb70ee16deeb6a0727dba46450fb4bc001291d7bff971b",
+            "outcome": "stored",
+            "durable": true,
+            "receipt_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        ],
+        "summary": {
+          "principal_node_id": "principal-node:home",
+          "session_id": "sync-session:completed-005",
+          "direction": "pull",
+          "source_stream_id": "shared/clinical-review-v1",
+          "trigger": "peer_wake",
+          "terminal_state": "completed",
+          "started_at": {
+            "wall_time": "2026-08-04T16:00:00Z",
+            "monotonic_tick": 14000
+          },
+          "finished_at": {
+            "wall_time": "2026-08-04T16:00:02Z",
+            "monotonic_tick": 14002
+          },
+          "outcome": "replicated",
+          "records_examined": 1,
+          "cursor_committed": true,
+          "evidence_refs": [
+            "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          ],
+          "cursor_before": {
+            "source_stream_id": "shared/clinical-review-v1",
+            "opaque_token": "opaque:batch-001"
+          },
+          "cursor_after": {
+            "source_stream_id": "shared/clinical-review-v1",
+            "opaque_token": "opaque:batch-002"
+          },
+          "receipt_summary": {
+            "stored": 1,
+            "duplicate": 0,
+            "superseded": 0,
+            "rejected": 0,
+            "ambiguous": 0
+          }
+        }
+      },
+      "accepted_dispositions": [
+        "committed",
+        "already_committed_same"
+      ]
+    }
+  ],
+  "expected": {
+    "retry_operation": "retry_pending_continuity",
+    "new_session_id_issued": false,
+    "ambiguous_response_returns_same_candidate": true,
+    "conflicting_content": "conflicting_continuity_content"
+  }
+}

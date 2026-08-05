@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-scan-progress-v0.1",
+    "type": "fixture",
+    "description": "Zero-record source scan progress under one immutable SourceStreamId predicate.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Commit filtered scan progress without manufacturing receipts",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "source_stream_id": "shared/clinical-review-v1",
+  "selection_binding": {
+    "predicate_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "immutable_for_source_stream_id": true,
+    "redefinition_requires_new_source_stream_id": true
+  },
+  "cursor_before": {
+    "source_stream_id": "shared/clinical-review-v1",
+    "opaque_token": "opaque:scan-001"
+  },
+  "cases": [
+    {
+      "source_page": {
+        "batch": {
+          "records": [],
+          "next_cursor": "opaque:scan-002",
+          "caught_up": false
+        },
+        "cursor_progress": "advanced"
+      },
+      "expected_outcome": "scan_progress"
+    },
+    {
+      "source_page": {
+        "batch": {
+          "records": [],
+          "next_cursor": "opaque:scan-003",
+          "caught_up": true
+        },
+        "cursor_progress": "advanced"
+      },
+      "expected_outcome": "caught_up"
+    }
+  ],
+  "expected": {
+    "first_transition": "begin_cursor_commit",
+    "terminal_transition": "cursor_durable",
+    "continuity_operation": "commit_completed",
+    "records_examined": 0,
+    "receipt_evidence": [],
+    "cursor_committed": true,
+    "atomic_cursor_and_summary": true
+  },
+  "malformed_case": {
+    "source_page": {
+      "batch": {
+        "records": [],
+        "next_cursor": "opaque:scan-001",
+        "caught_up": false
+      },
+      "cursor_progress": "unchanged"
+    },
+    "classification": "malformed_source_batch",
+    "transition": "evaluation_failure",
+    "cursor_committed": false
+  }
+}

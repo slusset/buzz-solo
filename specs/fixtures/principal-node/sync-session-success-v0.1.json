@@ -1,0 +1,169 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-success-v0.1",
+    "type": "fixture",
+    "description": "A deterministic exact-envelope pull attempt with a durable checkpoint-safe receipt.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Commit the exact source cursor after checkpoint-safe receipts",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "request": {
+    "principal_node_id": "principal-node:home",
+    "direction": "pull",
+    "source_stream_id": "shared/clinical-review-v1",
+    "trigger": "peer_wake"
+  },
+  "issued_session_id": "sync-session:002",
+  "clock": {
+    "started_at": {
+      "wall_time": "2026-08-04T14:00:00Z",
+      "monotonic_tick": 12000
+    },
+    "evaluated_at": {
+      "wall_time": "2026-08-04T14:00:01Z",
+      "monotonic_tick": 12001
+    },
+    "finished_at": {
+      "wall_time": "2026-08-04T14:00:03Z",
+      "monotonic_tick": 12003
+    }
+  },
+  "transport_evidence": {
+    "transport_principal": "did:buzz:destination-node#transport-1",
+    "source_stream_id": "shared/clinical-review-v1",
+    "direction": "pull",
+    "authenticated_at": {
+      "wall_time": "2026-08-04T14:00:01Z",
+      "monotonic_tick": 12001
+    },
+    "evidence_ref": "transport-evidence:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "current_plan": {
+    "principal_node_id": "principal-node:home",
+    "source_stream_id": "shared/clinical-review-v1",
+    "direction": "pull",
+    "domain_authorization_ref": "event:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "node_authorization_ref": "event:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "agreement_snapshot_ref": "agreement:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "export_head_ref": "event:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "admit_head_ref": "event:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "selection": {
+      "filter": [
+        {
+          "kinds": [
+            1,
+            39000
+          ],
+          "#h": [
+            "clinical-review"
+          ]
+        }
+      ]
+    },
+    "transport_principal": "did:buzz:destination-node#transport-1",
+    "transport_evidence_ref": "transport-evidence:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "evaluated_at": {
+      "wall_time": "2026-08-04T14:00:01Z",
+      "monotonic_tick": 12001
+    },
+    "batch_limit": 64
+  },
+  "cursor_before": {
+    "source_stream_id": "shared/clinical-review-v1",
+    "opaque_token": "opaque:batch-001"
+  },
+  "source_page": {
+    "batch": {
+      "records": [
+      {
+        "source": "shared/clinical-review-v1",
+        "cursor": "opaque:batch-002",
+        "event": {
+          "id": "d892a65e7677e0554ebb70ee16deeb6a0727dba46450fb4bc001291d7bff971b",
+          "pubkey": "c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "created_at": 1713956400,
+          "kind": 1,
+          "tags": [
+            [
+              "auth",
+              "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "kind=1&created_at<1713957000",
+              "8b7df2575caf0a108374f8471722b233c53f9ff827a8b0f91861966c3b9dd5cb2e189eae9f49d72187674c2f5bd244145e10ff86c9f257ffe65a1ee5f108b369"
+            ]
+          ],
+          "content": "owner-attested agent event",
+          "sig": "7fd38992b70b5e9e113644e51b4c8ee2227f3bdd402b1855f8786c0600394ab3ec2621742a7bad0b0000b93d4d1ae6e39525f286a3c1029f43f46c3359a6c76f"
+        }
+      }
+      ],
+      "next_cursor": "opaque:batch-002",
+      "caught_up": true
+    },
+    "cursor_progress": "advanced"
+  },
+  "receipts": [
+    {
+      "source": "shared/clinical-review-v1",
+      "cursor": "opaque:batch-002",
+      "event_id": "d892a65e7677e0554ebb70ee16deeb6a0727dba46450fb4bc001291d7bff971b",
+      "outcome": "stored",
+      "durable": true,
+      "receipt_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "expected_continuity_commit": {
+    "operation": "commit_completed",
+    "expected": {
+      "source_stream_id": "shared/clinical-review-v1",
+      "opaque_token": "opaque:batch-001"
+    },
+    "candidate": {
+      "source_stream_id": "shared/clinical-review-v1",
+      "opaque_token": "opaque:batch-002"
+    },
+    "receipt_count": 1,
+    "summary_ref": "expected_summary",
+    "atomic": true
+  },
+  "expected_summary": {
+    "principal_node_id": "principal-node:home",
+    "session_id": "sync-session:002",
+    "direction": "pull",
+    "source_stream_id": "shared/clinical-review-v1",
+    "trigger": "peer_wake",
+    "terminal_state": "completed",
+    "started_at": {
+      "wall_time": "2026-08-04T14:00:00Z",
+      "monotonic_tick": 12000
+    },
+    "finished_at": {
+      "wall_time": "2026-08-04T14:00:03Z",
+      "monotonic_tick": 12003
+    },
+    "outcome": "replicated",
+    "records_examined": 1,
+    "cursor_committed": true,
+    "evidence_refs": [
+      "agreement:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "transport-evidence:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    ],
+    "agreement_snapshot_ref": "agreement:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "cursor_before": {
+      "source_stream_id": "shared/clinical-review-v1",
+      "opaque_token": "opaque:batch-001"
+    },
+    "cursor_after": {
+      "source_stream_id": "shared/clinical-review-v1",
+      "opaque_token": "opaque:batch-002"
+    },
+    "receipt_summary": {
+      "stored": 1,
+      "duplicate": 0,
+      "superseded": 0,
+      "rejected": 0,
+      "ambiguous": 0
+    }
+  }
+}

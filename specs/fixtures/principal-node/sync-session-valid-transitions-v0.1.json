@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "id": "principal-node-sync-session-valid-transitions-v0.1",
+    "type": "fixture",
+    "description": "Every transition declared by the SyncSession lifecycle.",
+    "story": "specs/stories/principal-node/place-synchronization-inside-principal-node.md",
+    "feature": "specs/features/principal-node/sync-session.feature",
+    "scenario": "Cover every declared valid lifecycle transition",
+    "contract": "specs/contracts/principal-node/sync-session-ports.yaml"
+  },
+  "transitions": [
+    {
+      "name": "begin_evaluation",
+      "from": "requested",
+      "to": "evaluating",
+      "durability": "no_terminal_persistence"
+    },
+    {
+      "name": "no_work_needed",
+      "from": "evaluating",
+      "to": "completed",
+      "durability": "completed_summary_durable"
+    },
+    {
+      "name": "begin_transfer",
+      "from": "evaluating",
+      "to": "transferring",
+      "durability": "no_terminal_persistence"
+    },
+    {
+      "name": "begin_cursor_commit",
+      "from": "evaluating",
+      "to": "committing_cursor",
+      "durability": "no_terminal_persistence"
+    },
+    {
+      "name": "refuse_transfer",
+      "from": "evaluating",
+      "to": "blocked",
+      "durability": "blocked_summary_durable"
+    },
+    {
+      "name": "evaluation_failure",
+      "from": "evaluating",
+      "to": "failed",
+      "durability": "granular_failed_summary_durable"
+    },
+    {
+      "name": "batch_delivered",
+      "from": "transferring",
+      "to": "awaiting_durable_receipts",
+      "durability": "no_terminal_persistence"
+    },
+    {
+      "name": "transport_failure",
+      "from": "transferring",
+      "to": "failed",
+      "durability": "failed_summary_durable"
+    },
+    {
+      "name": "receipts_checkpoint_safe",
+      "from": "awaiting_durable_receipts",
+      "to": "committing_cursor",
+      "durability": "no_terminal_persistence"
+    },
+    {
+      "name": "receipts_not_checkpoint_safe",
+      "from": "awaiting_durable_receipts",
+      "to": "failed",
+      "durability": "failed_summary_durable"
+    },
+    {
+      "name": "cursor_durable",
+      "from": "committing_cursor",
+      "to": "completed",
+      "durability": "cursor_and_completed_summary_atomic"
+    },
+    {
+      "name": "cursor_write_failed",
+      "from": "committing_cursor",
+      "to": "failed",
+      "durability": "failed_summary_durable"
+    },
+    {
+      "name": "cancel_at_safe_boundary",
+      "from": [
+        "requested",
+        "evaluating"
+      ],
+      "to": "cancelled",
+      "durability": "cancelled_summary_durable"
+    }
+  ]
+}
