@@ -170,6 +170,6 @@ boundaries:
     - key generation custody recovery and user experience
     - deployment membership roles grants and rate limits
     - encryption key distribution
-    - replication discovery transport topology and scheduling
+    - replication discovery transport topology and scheduling, owned by the PrincipalNode aggregate
     - authentication security-audit storage
     - identity proofing for legal or biometric identity

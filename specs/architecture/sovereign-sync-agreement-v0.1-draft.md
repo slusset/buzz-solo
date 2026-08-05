@@ -37,7 +37,9 @@ record; declarations are names and intent, never credentials.
 The vocabulary intentionally keeps five roles distinct:
 
 1. **Owner identity** signs declarations and controls one node's policy.
-2. **Node principal** is a stable operator label whose transport keys may rotate.
+2. **Principal Node ID** is the stable operational identity whose transport
+   keys may rotate; each PrincipalNode is separately authorized by one
+   PrincipalDomain.
 3. **Transport verification key** proves a caller may move records for a named
    source or read grant.
 4. **Event author** signs the exact Nostr event being transported.
@@ -274,9 +276,9 @@ separately: neither implies the other.
 Rule (2)'s pin is the drift detector: if `A` replaces its export declaration
 (new selection ⇒ new stream ID; new readers or metadata ⇒ same `d`, new
 event ID), `B`'s pin goes stale and the match breaks **visibly** until `B`
-re-pins. Tooling SHOULD surface unmatched-declaration state; runtimes MAY
-refuse to serve or ingest unmatched streams (strictness is adapter policy in
-v0.1, normative in a later revision once operational experience accumulates).
+re-pins. Tooling SHOULD surface unmatched-declaration state; PrincipalNodes MAY
+refuse to serve or ingest unmatched streams (strictness is PrincipalNode policy in v0.1,
+normative in a later revision once operational experience accumulates).
 
 ## Artifacts
 
@@ -377,6 +379,8 @@ adapter at each replication request. Three rules:
 - Telos: [`../TELOS.md`](../TELOS.md)
 - Parent boundary:
   [`portable-relay-boundary.md`](portable-relay-boundary.md)
+- PrincipalNode owner:
+  [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)
 - Replication semantics: the replication profile and
   [selective streams](portable-relay-boundary.md) invariants
   (predicate-is-identity, source-owned cursors, checkpoint-safe receipts)

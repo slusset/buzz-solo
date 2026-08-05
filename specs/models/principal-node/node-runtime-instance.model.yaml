@@ -1,0 +1,141 @@
+id: node-runtime-instance
+type: model
+entity: NodeRuntimeInstance
+aggregate: PrincipalNode
+description: |
+  One ephemeral execution of a verified runtime release for a Principal Node
+  through a selected host binding. It is the composition root for concrete
+  adapters and has no identity or authority independent of the Principal Node.
+
+sources:
+  stories:
+    - specs/stories/principal-node/authorize-principal-node.md
+    - specs/stories/principal-node/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/principal-node/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-principal-node.md
+  architecture:
+    - specs/architecture/principal-node-boundary-v0.1.md
+
+identity:
+  fields: [principal_node_id, runtime_instance_id]
+  description: An instance ID distinguishes executions and never replaces PrincipalNodeId.
+
+attributes:
+  principal_node_id:
+    type: PrincipalNodeId
+    required: true
+    immutable: true
+  runtime_instance_id:
+    type: RuntimeInstanceId
+    required: true
+    immutable: true
+  release_evidence:
+    type: RuntimeReleaseEvidence
+    required: true
+    immutable: true
+  host_binding_digest:
+    type: ContentDigest
+    required: true
+    immutable: true
+  composition_root_revision:
+    type: string
+    required: true
+    immutable: true
+  lifecycle_state:
+    type: enum
+    required: true
+    derived: true
+    values: [selected, starting, running, degraded, refused, quiescing, stopped, crashed]
+    see: node-runtime-instance.lifecycle.yaml
+  process_handle:
+    type: HostProcessReference
+    required: false
+    description: Host-local observation only; never identity or durable authority.
+  started_at:
+    type: timestamp
+    required: false
+  ended_at:
+    type: timestamp
+    required: false
+  termination_evidence:
+    type: RuntimeTerminationEvidence
+    required: false
+
+value_objects:
+  - name: PrincipalNodeId
+    representation: stable_principal_uri
+  - name: RuntimeInstanceId
+    representation: random_instance_identifier
+  - name: RuntimeReleaseEvidence
+    representation: [version, source_revision, artifact_digest, signature, compatibility_claims]
+  - name: ContentDigest
+    representation: sha256
+  - name: HostProcessReference
+    representation: opaque_host_local_reference
+  - name: RuntimeTerminationEvidence
+    representation: [classification, observed_at, bounded_host_evidence]
+
+relationships:
+  principal_node:
+    type: belongs-to-exactly-one
+    entity: PrincipalNode
+  host_binding:
+    type: executes-through-one
+    entity: HostCapabilityBinding
+
+commands:
+  - name: PrepareRuntimeInstance
+    actor: principal_node
+    input: [principal_node_id, selected_release, host_binding, composition_root_revision]
+    output: selected_runtime_instance
+  - name: LaunchRuntimeInstance
+    actor: host_supervisor
+    input: [selected_runtime_instance]
+    output: process_reference_and_starting_evidence
+  - name: ReportRuntimeEvidence
+    actor: runtime_instance
+    input: [release_digest, principal_node_id, host_binding_digest, composition_root_revision]
+    output: bounded_runtime_evidence
+  - name: RequestQuiescence
+    actor: principal_node_or_host_supervisor
+    input: [reason]
+    output: quiescing_instance
+  - name: RecordTermination
+    actor: host_supervisor
+    input: [process_reference, bounded_termination_evidence]
+    output: stopped_or_crashed_instance
+
+rules:
+  - id: instance-selection-is-principal-node-owned
+    description: Only the Principal Node selects an instance; a host may launch only that selection.
+    enforced: authorization
+  - id: process-handle-is-host-local
+    description: PID and process references remain operational evidence and never enter Principal Node identity.
+    enforced: disclosure
+  - id: composition-root-wires-adapters
+    description: Concrete relay, cursor, transport, host, release, and interface adapters are selected only here.
+    enforced: application
+
+invariants:
+  - id: instance-has-no-independent-authority
+    description: Running bytes cannot create domain authorization, node identity, cursor policy, or host binding.
+  - id: instance-matches-node-selection
+    description: Release, PrincipalNodeId, host binding, and composition-root revision match the Principal Node's active selection.
+  - id: replacement-preserves-continuity
+    description: A successor instance resumes Principal Node durable state and never relies on predecessor memory or PID history.
+  - id: instance-is-not-a-journal-author
+    description: The process itself does not become event author; configured signing capabilities retain attribution.
+
+boundaries:
+  inside:
+    - executable selection evidence
+    - composition-root wiring
+    - process lifecycle observation
+    - bounded runtime and termination evidence
+  outside:
+    - Principal Domain and Principal Node identity
+    - domain and synchronization policy
+    - cursor commitment authority
+    - host implementation details
+    - release production and signing

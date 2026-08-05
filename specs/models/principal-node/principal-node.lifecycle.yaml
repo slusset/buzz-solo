@@ -1,0 +1,135 @@
+id: principal-node-lifecycle
+type: model
+entity: PrincipalNode
+description: |
+  Lifecycle of a stable Principal Node across authorization, host/release
+  binding, Runtime Instance replacement, offline periods, and revocation.
+
+sources:
+  stories:
+    - specs/stories/principal-node/authorize-principal-node.md
+    - specs/stories/principal-node/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/principal-node/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-principal-node.md
+  architecture:
+    - specs/architecture/principal-node-boundary-v0.1.md
+
+initial_state: proposed
+
+states:
+  proposed:
+    description: A stable PrincipalNodeId is proposed but lacks current domain authorization.
+    terminal: false
+  authorized:
+    description: One Principal Domain currently authorizes the node; no active Runtime Instance is selected.
+    terminal: false
+  binding:
+    description: Host claim, release, continuity, and Runtime Instance evidence are being verified.
+    terminal: false
+  operational:
+    description: Current domain authorization, host binding, release, and active Runtime Instance all verify.
+    terminal: false
+  degraded:
+    description: Required continuity holds, but an optional capability or noncritical observation is unavailable.
+    terminal: false
+  blocked:
+    description: A required authorization, capability, compatibility, or continuity invariant failed closed.
+    terminal: false
+  quiescing:
+    description: New work is refused while active transitions reach checkpoint-safe boundaries.
+    terminal: false
+  offline:
+    description: Authorization and continuity remain durable with no active Runtime Instance.
+    terminal: false
+  revoked:
+    description: The Principal Domain revoked authorization; no new PrincipalNode-owned operation is admissible.
+    terminal: true
+
+transitions:
+  authorize_node:
+    from: proposed
+    to: authorized
+    trigger: principal_domain_root_authority
+    guards:
+      - authorization-signature-verifies
+      - authorization-names-this-node-and-one-domain
+  prepare_activation:
+    from: [authorized, offline, blocked]
+    to: binding
+    trigger: principal_node_operator
+    guards:
+      - domain-authorization-current
+  activate:
+    from: binding
+    to: operational
+    trigger: principal_node
+    guards:
+      - domain-authorization-current
+      - host-claim-and-binding-verify
+      - release-and-state-schemas-compatible
+      - runtime-instance-evidence-matches-selection
+      - journal-and-cursor-heads-verify
+  activate_degraded:
+    from: binding
+    to: degraded
+    trigger: principal_node
+    guards:
+      - every-required-invariant-holds
+      - only-optional-capabilities-are-missing
+  fail_activation_closed:
+    from: binding
+    to: blocked
+    trigger: principal_node
+    guards:
+      - required-authorization-capability-or-invariant-failed
+  observe_optional_loss:
+    from: operational
+    to: degraded
+    trigger: coherence_observation
+  recover_optional_capability:
+    from: degraded
+    to: operational
+    trigger: coherence_observation
+  observe_required_violation:
+    from: [operational, degraded]
+    to: blocked
+    trigger: coherence_observation
+  runtime_instance_lost:
+    from: [operational, degraded, blocked]
+    to: offline
+    trigger: runtime_instance_stopped_or_crashed
+    effects:
+      - clear active Runtime Instance selection
+      - preserve Principal Node identity and continuity
+  request_quiescence:
+    from: [operational, degraded, blocked]
+    to: quiescing
+    trigger: principal_node_operator_or_host_supervisor
+  finish_quiescence:
+    from: quiescing
+    to: offline
+    trigger: principal_node
+    guards:
+      - no-transition-is-in-flight
+      - checkpoint-safe-cursors-persisted
+      - final-signed-checkpoint-written
+  revoke_authorization:
+    from: [proposed, authorized, binding, operational, degraded, blocked, quiescing, offline]
+    to: revoked
+    trigger: principal_domain_root_authority
+    effects:
+      - refuse new Principal Node operations
+      - quiesce any active Runtime Instance at the next safe boundary
+
+invalid:
+  - transition: host_signal_directly_to_operational
+    reason: A host signal cannot bypass domain authorization, release, host binding, continuity, and instance verification.
+  - transition: runtime_process_creates_authorization
+    reason: Process execution never creates Principal Domain or Principal Node authority.
+  - transition: bind_second_domain
+    reason: One Principal Node represents exactly one Principal Domain.
+  - transition: revoked_to_any
+    reason: Revocation is terminal for this authorization lifecycle; re-entry requires a new authorization head and explicit policy.
+  - transition: offline_changes_identity
+    reason: Losing a Runtime Instance preserves PrincipalNodeId and durable continuity.

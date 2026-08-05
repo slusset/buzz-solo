@@ -202,7 +202,7 @@ rules:
 
 invariants:
   - id: identity-layers-remain-distinct
-    description: Owner identity, node principal, transport key, event author, and custodian are never inferred from one another.
+    description: Owner identity, PrincipalNode ID, transport key, event author, and custodian are never inferred from one another.
   - id: signed-event-envelope-preserved
     description: Replication never rewrites event ID, author, kind, tags, content, or signature.
   - id: unmatched-heads-confer-no-agreement
@@ -230,6 +230,6 @@ boundaries:
     - legal identity proofing
     - private key custody and recovery
     - automatic counterparty discovery
-    - scheduling and retry policy
+    - scheduling and retry policy, owned by the PrincipalNode aggregate
     - user-interface presentation
     - artifact encryption key exchange

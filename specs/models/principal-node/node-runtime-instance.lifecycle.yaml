@@ -1,0 +1,104 @@
+id: node-runtime-instance-lifecycle
+type: model
+entity: NodeRuntimeInstance
+description: |
+  Ephemeral process lifecycle for one Principal-Node-selected runtime
+  execution. Every replacement creates a new RuntimeInstanceId.
+
+sources:
+  stories:
+    - specs/stories/principal-node/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/principal-node/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-principal-node.md
+  architecture:
+    - specs/architecture/principal-node-boundary-v0.1.md
+
+initial_state: selected
+
+states:
+  selected:
+    description: The Principal Node selected release, host binding, and composition-root evidence; no process exists yet.
+    terminal: false
+  starting:
+    description: The host launched the process and compatibility evidence is being checked before mutation.
+    terminal: false
+  running:
+    description: Instance evidence matches the Principal Node selection and required capabilities are healthy.
+    terminal: false
+  degraded:
+    description: Required guarantees hold but an optional runtime or host capability is unavailable.
+    terminal: false
+  refused:
+    description: Required release, binding, authorization, or continuity evidence failed before admissible mutation.
+    terminal: true
+  quiescing:
+    description: New work is refused while the Principal Node reaches a checkpoint-safe boundary.
+    terminal: false
+  stopped:
+    description: Process ended after successful quiescence and final evidence collection.
+    terminal: true
+  crashed:
+    description: Host evidence shows the process ended without successful quiescence.
+    terminal: true
+
+transitions:
+  launch:
+    from: selected
+    to: starting
+    trigger: host_supervisor
+  verify_and_run:
+    from: starting
+    to: running
+    trigger: principal_node
+    guards:
+      - domain-authorization-current
+      - release-evidence-matches-selection
+      - host-binding-matches-selection
+      - principal-node-continuity-verifies
+      - composition-root-revision-matches
+  start_degraded:
+    from: starting
+    to: degraded
+    trigger: principal_node
+    guards:
+      - all-required-invariants-hold
+      - only-optional-capabilities-are-missing
+  refuse_start:
+    from: starting
+    to: refused
+    trigger: principal_node
+    guards:
+      - required-evidence-failed
+  observe_optional_loss:
+    from: running
+    to: degraded
+    trigger: coherence_observation
+  recover_optional_capability:
+    from: degraded
+    to: running
+    trigger: coherence_observation
+  request_quiescence:
+    from: [running, degraded]
+    to: quiescing
+    trigger: principal_node_or_host_supervisor
+  finish_quiescence:
+    from: quiescing
+    to: stopped
+    trigger: principal_node
+    guards:
+      - Principal Node final checkpoint is durable
+  observe_crash:
+    from: [starting, running, degraded, quiescing]
+    to: crashed
+    trigger: host_supervisor
+
+invalid:
+  - transition: process_start_directly_to_running
+    reason: Host launch cannot bypass Principal Node authorization and compatibility checks.
+  - transition: restart_terminal_instance
+    reason: Relaunch creates a new RuntimeInstanceId and preserves the terminal evidence of this execution.
+  - transition: instance_changes_principal_node
+    reason: A Runtime Instance belongs to exactly one Principal Node for its lifetime.
+  - transition: crash_changes_node_identity
+    reason: Instance loss changes neither PrincipalNodeId nor durable node continuity.

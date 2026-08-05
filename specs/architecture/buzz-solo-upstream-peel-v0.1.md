@@ -148,6 +148,6 @@ the compose file left the tree; its volumes remain until removed manually
 
 ## Non-goals
 
-- No change to the sovereign node runtime, profiles, or journal semantics.
+- No change to PrincipalDomain, PrincipalNode, profiles, or journal semantics.
 - No history rewrite; upstream ancestry remains shared so cherry-picks stay
   cheap.

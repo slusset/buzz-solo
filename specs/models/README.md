@@ -23,8 +23,13 @@
 | Principal | A person, agent, relay node, or system identity recognized by local security policy. |
 | Authenticated principal | An ephemeral, audience-bound result proving current control of an authorized verification method. |
 | Append context | The declared origin of an append: direct, replication, or system. |
-| Relay node principal | A stable node identifier, potentially a DID, whose active verification keys may rotate. |
-| Peer binding | Destination-controlled configuration binding one replication source to an authenticated relay node principal. |
+| Principal Domain | The stable, identity-bound root context and logical journal. It survives root-key rotation and the loss or replacement of any node, host, or runtime instance. |
+| Principal Domain ID | The stable identifier of a Principal Domain. A domain-root verification key authorizes it but is not the identifier itself. |
+| Domain-root verification key | The current rotatable key authorized to establish or update Principal Domain root authority. Historically called the root node key. |
+| Principal Node | A stable operational representative authorized by exactly one Principal Domain. It owns synchronization, cursors, checkpoints, host binding, release selection, and coherence. |
+| Principal Node ID | The stable identity of a Principal Node, independent of host, process, release, and rotating verification keys. The portable identity profile's relay node principal projects this identifier. |
+| Principal Node authorization | A domain-root-signed grant binding one Principal Node ID to one Principal Domain with explicit scope and lifecycle. |
+| Peer binding | Destination-controlled configuration binding one replication source to an authenticated Principal Node ID. |
 | Delegation | A cryptographically verified, scoped grant allowing a principal to act under explicitly stated conditions. |
 | Read authorization | Request-level and per-event policy applied consistently to query, count, historical, and live delivery. |
 | Stable node key | A normalized operator-controlled routing identifier selecting one logical relay state boundary; it is not a credential. |
@@ -33,7 +38,7 @@
 | Conformance tier | One evidence environment: deterministic kernel, local Workers runtime, or deployed preview. |
 | Object eviction | Removal of a Durable Object's in-memory instance while its durable storage remains available for reconstruction. |
 | Sovereign owner | The application identity authorized to sign policy declarations for one or more nodes. |
-| Node principal | A stable identity naming an operated node independently of its rotating transport keys. |
+| Node Runtime Instance | One ephemeral process execution of a verified node runtime release for a Principal Node. It has no independent identity or authority. |
 | Transport verification key | A key used to authenticate replication reads or deliveries; it does not own policy or event content. |
 | Event stream | One immutable selection of signed events identified by a stream ID. |
 | Stream export | A source-owner declaration offering an event stream to named counterparty owners. |
@@ -48,3 +53,12 @@
 | Context binding | The unique, fail-closed association between one harness session and one opted-in bounded context. |
 | Lifecycle residue | Metadata-only start, completion, or interruption evidence written for an agent session inside its context boundary. |
 | Context checkpoint | A local, manifest-last replacement that records accepted artifact drift and repository metadata without implying publication. |
+| Principal context artifact | Portable reconstruction evidence for a Principal Domain and an authorized Principal Node, excluding private credential material. |
+| Principal Node checkpoint | A node-signed statement binding domain and node identity, authorization, journal and declaration heads, cursor heads, selected release, profile digest, and host binding evidence. |
+| Host adapter | An OS/runtime-specific implementation of declared supervision, placement, custody, clock/wake, session, or attestation capabilities; it has no domain authority by itself. |
+| Host capability claim | A host-attestation-signed declaration of mechanical capabilities and opaque references available to a RuntimeInstance. It is evidence, not authority. |
+| Host binding | A PrincipalNode-signed selection of one verified host capability claim for a bounded purpose and validity interval. |
+| Wake signal | A host or peer indication that a Principal Node may evaluate work now; it carries no stream, cursor, grant, or transition authority. |
+| Sync session | One PrincipalNode-owned execution of the common synchronization lifecycle for a source-bound stream and direction. |
+| Coherence observation | A read-only four-state result for one named invariant and subject, with bounded evidence references. |
+| Runtime release | Signed provenance, integrity, and compatibility evidence selected by a PrincipalNode for a RuntimeInstance; it is never authority over journal state. |

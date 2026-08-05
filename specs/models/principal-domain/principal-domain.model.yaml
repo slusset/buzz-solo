@@ -1,0 +1,190 @@
+id: principal-domain
+type: model
+entity: PrincipalDomain
+aggregate: PrincipalDomain
+description: |
+  The stable root context and durable authority boundary for one Buzz domain.
+  It owns the logical journal, domain policy declarations, nested bounded
+  contexts, and authorization of Principal Nodes. Its identity survives
+  domain-root verification-key rotation and the loss of every node or host.
+
+sources:
+  stories:
+    - specs/stories/principal-node/authorize-principal-node.md
+    - specs/stories/principal-node/observe-principal-boundary-coherence.md
+  journeys:
+    - specs/journeys/evolve-a-principal-node.md
+  architecture:
+    - specs/architecture/principal-node-boundary-v0.1.md
+
+identity:
+  fields: [principal_domain_id]
+  description: |
+    A stable domain URI established by the immutable root declaration. The
+    current domain-root verification key authorizes changes but is not the
+    permanent domain identifier.
+
+attributes:
+  principal_domain_id:
+    type: PrincipalDomainId
+    required: true
+    immutable: true
+  root_context:
+    type: RootContextAddress
+    required: true
+    immutable: true
+  current_root_authority:
+    type: DomainRootAuthority
+    required: true
+    derived: true
+  journal_head:
+    type: JournalHead
+    required: true
+    derived: true
+  current_node_authorizations:
+    type: list<PrincipalNodeAuthorization>
+    required: true
+    derived: true
+  bounded_context_heads:
+    type: list<BoundedContextHead>
+    required: true
+    derived: true
+  policy_heads:
+    type: list<DomainPolicyHead>
+    required: true
+    derived: true
+
+entities:
+  - name: DomainRootBinding
+    identity: binding_event_id
+    replacement_semantics: append_only_rotation_chain
+    attributes:
+      - binding_event_id
+      - principal_domain_id
+      - verification_key
+      - previous_binding_event_id
+      - effective_at
+      - status
+      - signature
+    description: |
+      One signed step in the domain-root authority chain. Rotation preserves
+      PrincipalDomainId and prior signatures.
+  - name: PrincipalNodeAuthorization
+    identity: [principal_domain_id, principal_node_id]
+    replacement_semantics: parameterized_replaceable_head
+    attributes:
+      - authorization_event_id
+      - principal_domain_id
+      - principal_node_id
+      - scope
+      - node_verification_methods
+      - checkpoint_verification_methods
+      - status
+      - created_at
+      - signature
+    description: |
+      The current domain-root-signed permission for one Principal Node to
+      represent this domain. Revocation prevents new operations without
+      erasing historical evidence.
+  - name: BoundedContextHead
+    identity: context_id
+    attributes:
+      - context_id
+      - current_head_event_ids
+    description: A nested h-scoped context projected from the domain journal.
+
+value_objects:
+  - name: PrincipalDomainId
+    representation: stable_domain_uri
+  - name: RootContextAddress
+    representation: [principal_domain_id, root_context_id, genesis_event_id]
+  - name: DomainRootAuthority
+    representation: [binding_event_id, verification_key, effective_at]
+  - name: PrincipalNodeId
+    representation: stable_principal_uri
+  - name: JournalHead
+    representation: [last_event_id, event_count, content_hash]
+  - name: NodeAuthorizationScope
+    representation: named_domain_operation_set
+  - name: BoundedContextHead
+    representation: [h_tag, head_event_ids]
+  - name: DomainPolicyHead
+    representation: [kind, address, event_id]
+
+relationships:
+  root_authority_chain:
+    type: has-many-ordered
+    entity: DomainRootBinding
+  authorized_nodes:
+    type: has-many-current
+    entity: PrincipalNodeAuthorization
+  bounded_contexts:
+    type: has-many
+    entity: BoundedContextHead
+
+commands:
+  - name: EstablishPrincipalDomain
+    actor: domain_founder
+    input: [principal_domain_id, root_context, initial_root_verification_key]
+    output: immutable_root_declaration
+  - name: RotateDomainRootKey
+    actor: current_domain_root_authority
+    input: [current_binding_event_id, next_verification_key]
+    output: next_domain_root_binding
+    preconditions:
+      - current binding is effective
+      - rotation links to the current binding
+  - name: AuthorizePrincipalNode
+    actor: current_domain_root_authority
+    input: [principal_node_id, scope, node_verification_methods, checkpoint_verification_methods]
+    output: principal_node_authorization
+  - name: RevokePrincipalNode
+    actor: current_domain_root_authority
+    input: [principal_node_id, reason]
+    output: revoked_principal_node_authorization
+  - name: EvaluatePrincipalNodeAuthorization
+    input: [principal_node_id, requested_operation, current_authorization_head]
+    output: authorized_scope_or_refusal
+
+rules:
+  - id: root-key-authorizes-not-identifies
+    description: The current domain-root key authorizes the domain but never replaces PrincipalDomainId.
+    enforced: domain
+  - id: node-requires-current-domain-authorization
+    description: A Principal Node may initiate a domain operation only within its current authorization scope.
+    enforced: authorization
+  - id: node-belongs-to-one-domain
+    description: One PrincipalNodeId cannot have concurrent effective authorization as the same node entity in multiple Principal Domains.
+    enforced: domain
+  - id: root-rotation-is-linked
+    description: A root-key rotation links to and is signed under the current effective authority.
+    enforced: authorization
+  - id: revocation-has-no-retroactive-erasure
+    description: Revocation blocks new operations and preserves accepted history, receipts, and checkpoints.
+    enforced: domain
+
+invariants:
+  - id: domain-survives-key-rotation
+    description: Rotating the domain-root verification key does not change PrincipalDomainId or rewrite historical signatures.
+  - id: domain-survives-node-loss
+    description: Principal Domain identity and journal authority do not depend on any host, Principal Node, or Runtime Instance being active.
+  - id: one-logical-journal
+    description: Replicas and nodes may hold copies, but accepted domain history has one verifiable logical journal identity.
+  - id: nested-contexts-do-not-become-root-domains
+    description: An h-scoped bounded context remains governed by its Principal Domain unless explicitly established as a separate domain.
+  - id: identity-roles-remain-distinct
+    description: Domain-root, Principal Node, checkpoint, transport, event-author, host-attestation, and custodian identities are never inferred from one another.
+
+boundaries:
+  inside:
+    - stable root-context identity
+    - domain-root authority rotation
+    - logical journal and policy heads
+    - Principal Node authorization and revocation
+    - nested bounded-context membership
+  outside:
+    - node-local cursors and checkpoints
+    - runtime release and process execution
+    - host capabilities and placement
+    - transport implementation
+    - private key custody and recovery

@@ -1,0 +1,83 @@
+id: replication-cursor
+type: model
+entity: ReplicationCursor
+aggregate: PrincipalNode
+description: |
+  An opaque checkpoint position issued by one replication source stream and
+  persisted by the PrincipalNode only after checkpoint-safe destination
+  outcomes. It is neither a sequence number nor a host scheduler bookmark.
+
+sources:
+  stories:
+    - specs/stories/principal-node/place-synchronization-inside-principal-node.md
+  architecture:
+    - specs/architecture/portable-relay-boundary.md
+    - specs/architecture/principal-node-boundary-v0.1.md
+
+identity:
+  fields: [source_stream_id, opaque_token]
+  description: Both fields participate in equality; identical tokens from different sources are different cursors.
+
+attributes:
+  source_stream_id:
+    type: string
+    required: true
+    immutable: true
+  opaque_token:
+    type: bytes_or_string
+    required: true
+    immutable: true
+  committed_at:
+    type: timestamp
+    required: true
+    immutable: true
+  checkpoint_evidence:
+    type: list<ReceiptReference>
+    required: true
+    immutable: true
+
+value_objects:
+  - name: ReceiptReference
+    representation: [source_stream_id, event_id, outcome, receipt_digest]
+
+commands:
+  - name: CommitSourceCursor
+    actor: principal_node
+    input: [source_issued_cursor, checkpoint_safe_receipts]
+    output: durable_replication_cursor
+    preconditions:
+      - every receipt belongs to the same source stream
+      - every covered outcome is checkpoint-safe
+      - the cursor token is preserved exactly
+
+rules:
+  - id: source-interprets-token
+    description: Only the issuing replication source may interpret, order, or derive meaning from opaque_token.
+    enforced: domain
+  - id: principal-node-persists-unchanged
+    description: The PrincipalNode stores and returns the exact source-issued value.
+    enforced: application
+  - id: host-provides-storage-only
+    description: A host adapter may supply durable storage mechanics but cannot choose or advance a cursor.
+    enforced: authorization
+
+invariants:
+  - id: cursor-is-source-bound
+    description: A cursor is never supplied to a source stream other than source_stream_id.
+  - id: cursor-does-not-advance-over-unsafe-outcome
+    description: Rejected, ambiguous, or non-durable outcomes cannot be covered without a separate durable skip decision.
+  - id: cursor-is-not-parsed-by-destination
+    description: The destination and host never parse, increment, compare, rename semantically, or synthesize opaque_token.
+  - id: cursor-survives-runtime-instance-replacement
+    description: Recovery depends on durable PrincipalNode-owned cursor state, not RuntimeInstance memory or host scheduler history.
+
+boundaries:
+  inside:
+    - source binding
+    - opaque token preservation
+    - checkpoint evidence association
+  outside:
+    - source cursor encoding
+    - transport batching
+    - host job lifecycle
+    - skip and dead-letter authorization

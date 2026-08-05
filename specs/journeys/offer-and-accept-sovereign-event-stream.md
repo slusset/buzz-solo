@@ -23,7 +23,7 @@ authors.
 ## Preconditions
 
 - Each node has an application owner identity for signing declarations.
-- Each node has a stable node principal and one or more transport verification keys.
+- Each node has an authorized PrincipalNode ID and one or more transport verification keys.
 - Both parties know which owner identity represents the counterparty.
 - The source can express the intended event selection as a filter, mirror, or upstream source.
 
@@ -33,7 +33,7 @@ authors.
 
 - **User intent**: Know which identities own policy and which keys only move bytes.
 - **System response**: The relationship names the source owner, destination
-  owner, source and destination node principals, and transport verification
+  owner, source and destination PrincipalNode IDs, and transport verification
   keys without treating any one identity as interchangeable with another.
 - **Next**: Define the stream.
 

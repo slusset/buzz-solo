@@ -17,7 +17,7 @@ So that a named counterparty can assess exactly what I intend to share.
 
 ## Acceptance Criteria
 
-- [ ] The offer distinguishes owner identities, node principals, transport keys, and event authors.
+- [ ] The offer distinguishes owner identities, PrincipalNode IDs, transport keys, and event authors.
 - [ ] The stream has one explicit selection: filter, mirror, or upstream source.
 - [ ] Changing the selection requires a new stream ID.
 - [ ] The export is signed by the source owner identity.

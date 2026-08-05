@@ -1,0 +1,140 @@
+id: host-capability-claim
+type: model
+entity: HostCapabilityClaim
+aggregate: HostCapabilityClaim
+description: |
+  A signed host-local claim about mechanical capabilities available to a
+  NodeRuntimeInstance. The claim is evidence only until an authorized
+  PrincipalNode binds it. Neither claim nor binding grants domain authority.
+
+sources:
+  stories:
+    - specs/stories/principal-node/declare-host-capabilities-without-domain-authority.md
+    - specs/stories/principal-node/promote-compatible-node-runtime.md
+  journeys:
+    - specs/journeys/evolve-a-principal-node.md
+  architecture:
+    - specs/architecture/node-host-boundary-v0.1.md
+    - specs/architecture/principal-node-boundary-v0.1.md
+
+identity:
+  fields: [claim_digest]
+  description: The content digest identifies one immutable signed revision; host_label is presentation only.
+
+attributes:
+  claim_digest:
+    type: ContentDigest
+    required: true
+    immutable: true
+  claim_revision:
+    type: string
+    required: true
+    immutable: true
+  adapter_id:
+    type: string
+    required: true
+    immutable: true
+  host_label:
+    type: string
+    required: false
+    immutable: true
+    description: Presentation only; never identity or authority.
+  supervision:
+    type: SupervisionCapability
+    required: true
+  placement:
+    type: PlacementCapability
+    required: true
+  custody:
+    type: list<CustodyCapability>
+    required: true
+  clock_wake:
+    type: ClockWakeCapability
+    required: true
+  sessions:
+    type: SessionCapability
+    required: false
+  attestations:
+    type: list<AttestationCapability>
+    required: true
+  signer:
+    type: HostClaimSigner
+    required: true
+  signature:
+    type: Signature
+    required: true
+
+value_objects:
+  - name: ContentDigest
+    representation: sha256
+  - name: SupervisionCapability
+    representation: [start, stop, restart, health, boot_persistent]
+  - name: PlacementCapability
+    representation: [config_ref, data_ref, state_ref, cache_ref, runtime_ref, durability_claims]
+  - name: CustodyCapability
+    representation: [class, signing_interface, verification_levels, credential_reference_scheme]
+  - name: ClockWakeCapability
+    representation: [monotonic_clock, wall_clock, scheduled_wake, event_wake, minimum_resolution]
+  - name: SessionCapability
+    representation: [os_signals, harness_adapters, process_abandonment_evidence]
+  - name: AttestationCapability
+    representation: [kind, verification_properties]
+  - name: HostClaimSigner
+    representation: host_attestation_principal
+  - name: Signature
+    representation: detached_signature_over_canonical_claim
+
+commands:
+  - name: DeclareCapabilities
+    actor: host_adapter
+    input: [adapter_revision, capability_references, capability_properties]
+    output: unsigned_canonical_claim
+  - name: SignClaim
+    actor: host_claim_signer
+    input: [canonical_claim]
+    output: signed_host_capability_claim
+  - name: VerifyClaim
+    actor: principal_node
+    input: [signed_claim, trusted_host_attestation_policy]
+    output: verified_claim_or_refusal
+  - name: MatchCapabilityProfile
+    actor: principal_node
+    input: [verified_claim, required_capability_profile]
+    output: [satisfied, degraded, blocked]
+
+rules:
+  - id: claim-declares-ability-not-authority
+    description: A claimed host capability permits a mechanical call only after an authorized PrincipalNode binds and chooses it.
+    enforced: authorization
+  - id: references-not-secrets
+    description: Custody and placement fields contain opaque references and properties, never private key bytes or reusable credentials.
+    enforced: disclosure
+  - id: missing-capability-is-explicit
+    description: An unavailable required capability blocks startup; an unavailable optional capability produces declared degradation.
+    enforced: application
+  - id: minimum-profile-is-portable
+    description: Foreground supervision and file-backed development custody can satisfy the minimum profile without launchd or systemd.
+    enforced: conformance
+
+invariants:
+  - id: host-label-is-presentation-only
+    description: Changing host_label does not change claim signer, PrincipalNode, PrincipalDomain, owner, or authority.
+  - id: host-cannot-author-domain-decisions
+    description: The adapter cannot choose streams, interpret cursors, broaden grants, reconcile findings, or append domain events on its own authority.
+  - id: host-mechanisms-remain-external
+    description: Paths, service names, timer mechanisms, and credential identifiers remain outside journal events.
+  - id: equivalent-capabilities-are-observationally-consistent
+    description: Conforming adapters produce the same PrincipalNode-visible outcomes for capabilities they both declare.
+
+boundaries:
+  inside:
+    - host capability vocabulary
+    - canonical signed host claim
+    - host-local references and capability properties
+    - conformance profile matching
+  outside:
+    - PrincipalNode authorization, synchronization, and retry policy
+    - event and declaration authorship
+    - cursor interpretation and commitment policy
+    - PrincipalDomain and PrincipalNode identity or journal state
+    - OS-specific implementation details behind each capability

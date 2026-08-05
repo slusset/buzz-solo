@@ -7,12 +7,17 @@ Date: 2026-07-31
 
 Testing in Buzz Solo is **coherence observation at three time scales**:
 merge-time (the five CI lanes), runtime (this spec), and resurrection-time
-([the resurrection drill](resurrection-drill-v0.1.md)). Coherence
-monitoring is the runtime scale: the node continuously observes whether
-its three artifacts still agree —
+([the resurrection drill](resurrection-drill-v0.1.md)). Coherence monitoring
+is the runtime scale: each PrincipalNode continuously observes whether its
+architectural evidence still agrees —
 
 - **intent** — TELOS and the spec chain;
-- **code** — the repository at the running node's version;
+- **model and code** — stories, domain models, behavior contracts, and the
+  repository at the running node's version;
+- **principal authority** — stable PrincipalDomain identity, current root
+  authority, PrincipalNode authorization, and revocation state;
+- **release and host binding** — selected verified runtime bytes,
+  compatibility claims, host capability claim, and PrincipalNode binding;
 - **runtime** — the living state: journal, projections, declarations,
   replicas, sessions.
 
@@ -22,16 +27,20 @@ Two rules are absolute:
    is always a separate, explicit act. The monitor holds the same
    read-only posture as the context explorer and the same fail-closed
    philosophy as everything else.
-2. **Findings are journal residue.** A coherence observation lands as a
-   metadata-only witness event in the journal, so the node's
-   self-knowledge accumulates in the system it describes, is attributable
-   and replayable like everything else, and renders in the explorer.
+2. **Observation and recording are separate.** Evaluation is read-only.
+   After it completes, an authorized PrincipalNode identity may record the finding as
+   metadata-only witness residue through the normal append path. Recording is
+   never implicit and cannot change the subject that was observed.
+
+Coherence is a vector of named invariant observations. Every observation is
+`ok`, `drift`, `violation`, or `unknown`; one score may not average away a
+critical violation or missing evidence.
 
 ## Invariant catalog
 
 Each invariant names its existing machinery; monitoring is mostly the
-promotion of existing checks from "runs when invoked" to "runs on a
-cadence and leaves residue."
+promotion of existing checks from "runs when invoked" to "runs on a cadence"
+with an optional, separately authorized recording step.
 
 ### journal-integrity
 
@@ -62,6 +71,46 @@ lag window; drain-leg cursor health (advancing, resumable); beacon
 pulses observed from both nodes (`buzz context pulse` is the existing
 heartbeat — its absence is itself a finding).
 
+### domain-node-coherence
+
+The PrincipalDomain ID remains stable across root-key rotation; the current
+root-authority chain is valid; the PrincipalNode authorization names exactly
+one PrincipalDomain and is active for the operation being observed. A
+RuntimeInstance, release, host claim, or raw key appearing as the durable
+domain or node identity is a violation.
+
+### principal-node-coherence
+
+The live component graph agrees with the [Principal Domain and Principal Node
+boundary](principal-node-boundary-v0.1.md): one PrincipalNode owns
+synchronization, cursor, checkpoint, release-selection, and coherence
+decisions. Independently supervised pull, push, cursor, or coherence jobs are
+violations when they interpret domain state rather than act through
+PrincipalNode ports.
+
+### runtime-instance-coherence
+
+At most one RuntimeInstance is selected as active for a PrincipalNode at a
+semantic instant. Its executable digest, release manifest, host binding, and
+composition root agree with the PrincipalNode checkpoint. A stale process may
+exist physically during replacement but cannot remain selected or gain
+independent authority.
+
+### host-capability-coherence
+
+The active verified host capability claim and PrincipalNode-signed binding
+satisfy the selected RuntimeInstance's required profile. Placement, custody,
+supervision, clock/wake, session, and attestation claims resolve to bounded
+evidence. Missing evidence is `unknown`, never an inferred success; optional
+loss is explicit degradation.
+
+### release-coherence
+
+The running executable digest, source revision, supported state/profile
+schemas, and required host profile agree with verified release evidence. A
+valid release proves provenance, integrity, and compatibility claims; it never
+proves authority to replay or append journal state.
+
 ### session-coherence
 
 Sessions marked active whose namespaced identity can be checked against
@@ -84,20 +133,23 @@ merge-time CI cannot.
   `buzz context doctor` remains the operator-facing summary and gains a
   coherence section. (Namespace per the tooling spec: node-level
   commands never take a root.)
-- Scheduled runs ride the host adapter's supervision port (launchd
-  periodic on Nest; systemd timers elsewhere) — cadence is host policy,
-  not node code.
-- Findings are witness events carrying: invariant id, severity
-  (`info | drift | violation`), observed/expected references (event ids,
-  head addresses, cursor positions — never payload copies), and the
-  monitor's version. Metadata-only, same forbidden-list posture as
-  lifecycle residue.
+- Scheduled runs enter the PrincipalNode through the active RuntimeInstance's
+  clock/wake port. The PrincipalNode owns cadence and the invariant procedure;
+  launchd, systemd, a foreground loop, or another host mechanism only delivers
+  “evaluate now” with declared timing properties.
+- Observations carry invariant id, subject, status (`ok | drift | violation |
+  unknown`), criticality, observer revision, and observed/expected references
+  (event IDs, head addresses, cursor positions, release digests — never payload
+  copies or host-private identifiers).
+- Recording an observation is a separate authorized command. Its witness event
+  is metadata-only and follows the same forbidden-list posture as lifecycle
+  residue.
 - A finding that repeats does not re-append daily noise: findings are
   per-(invariant, subject) parameterized-replaceable heads; history of a
   drift lives in head replacements, and resolution replaces the head
   with a clean observation.
 
-## Cadence tiers (default policy, host-adjustable)
+## Cadence tiers (default node policy, constrained by host capabilities)
 
 | Tier | Invariants | Default |
 |---|---|---|
@@ -105,29 +157,36 @@ merge-time CI cannot.
 | Daily | projection-agreement, session-coherence, journal append-only | daily |
 | Deep | full replay equality, signature sampling, declaration probe, intent-coherence | weekly |
 
-Deep checks are local and bounded; anything requiring a network probe of
-a replica declares it and stays within existing authenticated legs — the
-monitor introduces no new transport.
+Deep checks are local and bounded; anything requiring a network probe of a
+replica declares it and stays within existing authenticated legs — the monitor
+introduces no new transport. A host may report that it cannot meet a requested
+cadence; the node records degradation or blocks a required profile rather than
+silently changing policy.
 
 ## Conformance sketch
 
 `coherence-monitoring-v0.1`:
 
 - every catalog invariant is observable on demand;
-- no monitor code path mutates journal, projections, declarations, or
-  replicas;
-- findings land as metadata-only witness heads and render in the
-  explorer;
+- every result is a named four-state observation, and critical unknowns or
+  violations remain individually visible;
+- no observation code path mutates journal, projections, declarations,
+  cursors, host binding, or replicas;
+- a separate authorized recording path can land findings as metadata-only
+  witness heads and render them in the explorer;
 - a seeded incoherence of each class (a tampered projection file, a
-  stale replica grant, an orphaned active session, an unspecced kind) is
-  detected by the corresponding invariant within its tier's cadence;
+  stale replica grant, an orphaned active session, an unspecced kind, an
+  independently supervised sync job, a missing host capability, or release
+byte skew, invalid node authorization, or stale RuntimeInstance selection) is
+detected by the corresponding invariant within its tier's
+  cadence;
 - monitoring runs produce no publication or replication side effects.
 
 ## Non-goals
 
 - Auto-repair of any kind (reconciliation stays explicit).
-- Alerting infrastructure — findings are journal residue; how a host
-  surfaces them (explorer, doctor, push) is host/adapter policy.
+- Alerting infrastructure — observations may be recorded as journal residue;
+  how a host surfaces them (explorer, doctor, push) is host/adapter policy.
 - Monitoring other owners' nodes.
 
 ## Traceability
@@ -143,4 +202,8 @@ monitor introduces no new transport.
   [`durable-context-tooling-v0.1.md`](durable-context-tooling-v0.1.md),
   [`../contracts/agent-harness/durable-context-hooks.yaml`](../contracts/agent-harness/durable-context-hooks.yaml)
 - Scheduling: [`node-host-boundary-v0.1.md`](node-host-boundary-v0.1.md)
-  (supervision port)
+  (clock/wake and supervision ports)
+- PrincipalDomain, PrincipalNode, and RuntimeInstance ownership:
+  [`principal-node-boundary-v0.1.md`](principal-node-boundary-v0.1.md)
+- Observation model:
+  [`../models/principal-node/coherence-observation.model.yaml`](../models/principal-node/coherence-observation.model.yaml)
